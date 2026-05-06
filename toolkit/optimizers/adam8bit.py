@@ -84,39 +84,47 @@ class Adam8bit(Optimizer):
                 if p.grad is None:
                     continue
 
-                grad = p.grad.data.to(torch.float32)
-                p_fp32 = p.clone().to(torch.float32)
-
-                # Apply weight decay (coupled variant)
-                if decay != 0 and not decouple:
-                    grad.add_(p_fp32.data, alpha=decay)
-
+                # -------------------------------
+                # STATE INITIALIZATION (runs once)
+                # -------------------------------
                 state = self.state[p]
 
-                # State initialization
                 if len(state) == 0:
                     state['step'] = 0
-                    # Exponential moving average of gradient values
-                    state['exp_avg'] = Auto8bitTensor(
-                        torch.zeros_like(p_fp32.data).detach())
-                    # Exponential moving average of squared gradient values
-                    state['exp_avg_sq'] = Auto8bitTensor(
-                        torch.zeros_like(p_fp32.data).detach())
 
+                    # Allocate FP32 buffer ONCE
+                    state['fp32_buffer'] = torch.zeros_like(p, dtype=torch.float32)
+
+                    # Allocate 8‑bit EMA tensors
+                    state['exp_avg'] = Auto8bitTensor(
+                        torch.zeros_like(state['fp32_buffer'])
+                    )
+                    state['exp_avg_sq'] = Auto8bitTensor(
+                        torch.zeros_like(state['fp32_buffer'])
+                    )
+
+                # -----------------------------------------
+                # REUSE THE FP32 BUFFER INSTEAD OF CLONING
+                # -----------------------------------------
+                p_fp32 = state['fp32_buffer']
+                p_fp32.copy_(p, non_blocking=True)
+
+                # Load EMAs as FP32 for math
                 exp_avg = state['exp_avg'].to(torch.float32)
                 exp_avg_sq = state['exp_avg_sq'].to(torch.float32)
 
+                # Step count
                 state['step'] += 1
                 bias_correction1 = 1 - beta1 ** state['step']
                 bias_correction2 = 1 - beta2 ** state['step']
 
                 # Adam EMA updates
-                exp_avg.mul_(beta1).add_(grad, alpha=1-beta1)
-                exp_avg_sq.mul_(beta2).addcmul_(grad, grad, value=1-beta2)
+                exp_avg.mul_(beta1).add_(grad, alpha=1 - beta1)
+                exp_avg_sq.mul_(beta2).addcmul_(grad, grad, value=1 - beta2)
 
-                # Apply weight decay (decoupled variant)
+                # Decoupled weight decay
                 if decay != 0 and decouple:
-                    p_fp32.data.mul_(1 - lr * decay)
+                    p_fp32.mul_(1 - lr * decay)
 
                 # Bias correction
                 step_size = lr / bias_correction1
