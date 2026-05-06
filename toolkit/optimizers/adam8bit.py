@@ -84,6 +84,10 @@ class Adam8bit(Optimizer):
                 if p.grad is None:
                     continue
 
+                grad = p.grad
+                
+                if grad.dtype != torch.float32:
+                    grad = grad.float()
                 # -------------------------------
                 # STATE INITIALIZATION (runs once)
                 # -------------------------------
