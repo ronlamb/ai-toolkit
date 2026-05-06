@@ -80,14 +80,28 @@ class Adam8bit(Optimizer):
             decay = group['weight_decay']
             decouple = group['decouple']
 
+            # -----------------------------------------
+            # GROUP-LEVEL STEP COUNTER (correct place)
+            # -----------------------------------------
+            if 'step' not in group:
+                group['step'] = 0
+            group['step'] += 1
+            step = group['step']
+
+            bias_correction1 = 1 - beta1 ** step
+            bias_correction2 = 1 - beta2 ** step
+            step_size = lr / bias_correction1
+            bias_correction2_sqrt = math.sqrt(bias_correction2)
+
             for p in group['params']:
                 if p.grad is None:
                     continue
 
                 grad = p.grad
-                
+
                 if grad.dtype != torch.float32:
                     grad = grad.float()
+
                 # -------------------------------
                 # STATE INITIALIZATION (runs once)
                 # -------------------------------
@@ -98,6 +112,9 @@ class Adam8bit(Optimizer):
 
                     # Allocate FP32 buffer ONCE
                     state['fp32_buffer'] = torch.zeros_like(p, dtype=torch.float32)
+
+                    state['exp_avg_fp32'] = torch.zeros_like(state['fp32_buffer'])
+                    state['exp_avg_sq_fp32'] = torch.zeros_like(state['fp32_buffer'])
 
                     # Allocate 8‑bit EMA tensors
                     state['exp_avg'] = Auto8bitTensor(
@@ -114,13 +131,15 @@ class Adam8bit(Optimizer):
                 p_fp32.copy_(p, non_blocking=True)
 
                 # Load EMAs as FP32 for math
-                exp_avg = state['exp_avg'].to(torch.float32)
-                exp_avg_sq = state['exp_avg_sq'].to(torch.float32)
+                exp_avg = state['exp_avg_fp32']
+                exp_avg_sq = state['exp_avg_sq_fp32']
+
+                # Load 8‑bit values into FP32 buffers only once per step
+                exp_avg.copy_(state['exp_avg'].to(torch.float32))
+                exp_avg_sq.copy_(state['exp_avg_sq'].to(torch.float32))
 
                 # Step count
-                state['step'] += 1
-                bias_correction1 = 1 - beta1 ** state['step']
-                bias_correction2 = 1 - beta2 ** state['step']
+                state['step'] = step
 
                 # Adam EMA updates
                 exp_avg.mul_(beta1).add_(grad, alpha=1 - beta1)
@@ -131,16 +150,16 @@ class Adam8bit(Optimizer):
                     p_fp32.mul_(1 - lr * decay)
 
                 # Bias correction
-                step_size = lr / bias_correction1
-                denom = (exp_avg_sq.sqrt() / math.sqrt(bias_correction2)).add_(eps)
+                denom = exp_avg_sq.sqrt().div_(bias_correction2_sqrt).add_(eps)
 
                 # Take step
-                p_fp32.data.addcdiv_(exp_avg, denom, value=-step_size)
-                
+                # p_fp32.data.addcdiv_(exp_avg, denom, value=-step_size)
+                p_fp32.addcdiv_(exp_avg, denom, value=-step_size)
+
                 # Update state with stochastic rounding
                 state['exp_avg'] = Auto8bitTensor(exp_avg)
                 state['exp_avg_sq'] = Auto8bitTensor(exp_avg_sq)
-                
+
                 # Apply stochastic rounding to parameters
                 copy_stochastic(p.data, p_fp32.data)
 
