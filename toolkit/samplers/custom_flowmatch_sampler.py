@@ -27,6 +27,9 @@ class CustomFlowMatchEulerDiscreteScheduler(FlowMatchEulerDiscreteScheduler):
         self.timestep_type = "linear"
 
         with torch.no_grad():
+            self.default_weighing_tensor = torch.tensor(
+               default_weighing_scheme, dtype=torch.float32
+)
             # create weights for timesteps
             num_timesteps = 1000
             # Bell-Shaped Mean-Normalized Timestep Weighting
@@ -58,35 +61,49 @@ class CustomFlowMatchEulerDiscreteScheduler(FlowMatchEulerDiscreteScheduler):
 
     def get_weights_for_timesteps(self, timesteps: torch.Tensor, v2=False, timestep_type="linear") -> torch.Tensor:
         # Get the indices of the timesteps
-        step_indices = [(self.timesteps == t).nonzero().item()
-                        for t in timesteps]
+        step_indices = self._get_step_indices(timesteps.to(self.timesteps.device))
 
         # Get the weights for the timesteps
         if timestep_type == "weighted":
-            weights = torch.tensor(
-                [default_weighing_scheme[i] for i in step_indices],
-                device=timesteps.device,
-                dtype=timesteps.dtype
-            )
+            # weights = torch.tensor(
+            #     [default_weighing_scheme[i] for i in step_indices],
+            #     device=timesteps.device,
+            #     dtype=timesteps.dtype
+            # )
+            weights = self.default_weighing_tensor[step_indices].to(device=timesteps.device, dtype=timesteps.dtype)
+        
         elif v2:
-            weights = self.linear_timesteps_weights2[step_indices].flatten()
+            # weights = self.linear_timesteps_weights2[step_indices].flatten()
+            weights = self.linear_timesteps_weights2.to(
+                device=timesteps.device, dtype=timesteps.dtype
+            )[step_indices]
         else:
-            weights = self.linear_timesteps_weights[step_indices].flatten()
-
+            # weights = self.linear_timesteps_weights[step_indices].flatten()
+            weights = self.linear_timesteps_weights.to(
+                device=timesteps.device, dtype=timesteps.dtype
+            )[step_indices]
         return weights
 
     def get_sigmas(self, timesteps: torch.Tensor, n_dim, dtype, device) -> torch.Tensor:
-        sigmas = self.sigmas.to(device=device, dtype=dtype)
-        schedule_timesteps = self.timesteps.to(device)
-        timesteps = timesteps.to(device)
-        step_indices = [(schedule_timesteps == t).nonzero().item()
-                        for t in timesteps]
+        # sigmas = self.sigmas.to(device=device, dtype=dtype)
+        # schedule_timesteps = self.timesteps.to(device)
+        # timesteps = timesteps.to(device)
+        # step_indices = [(schedule_timesteps == t).nonzero().item()
+        #                 for t in timesteps]
 
-        sigma = sigmas[step_indices].flatten()
-        while len(sigma.shape) < n_dim:
-            sigma = sigma.unsqueeze(-1)
+        # sigma = sigmas[step_indices].flatten()
+        # while len(sigma.shape) < n_dim:
+        #     sigma = sigma.unsqueeze(-1)
 
-        return sigma
+        # return sigma
+
+        step_indices = self._get_step_indices(timesteps.to(self.timesteps.device))
+        sigmas = self.sigmas[step_indices].to(device=device, dtype=dtype)
+
+        while len(sigmas.shape) < n_dim:
+            sigmas = sigmas.unsqueeze(-1)
+
+        return sigmas        
 
     def add_noise(
             self,
@@ -104,6 +121,30 @@ class CustomFlowMatchEulerDiscreteScheduler(FlowMatchEulerDiscreteScheduler):
     def scale_model_input(self, sample: torch.Tensor, timestep: Union[float, torch.Tensor]) -> torch.Tensor:
         return sample
 
+    def _get_step_indices(self, timesteps: torch.Tensor) -> torch.Tensor:
+        base = self.timesteps
+
+        # ensure same dtype/device
+        timesteps = timesteps.to(device=base.device, dtype=base.dtype)
+
+        if base[0] > base[-1]:
+            base = torch.flip(base, dims=[0])
+            flipped = True
+        else:
+            flipped = False
+
+        if flipped:
+            t = torch.flip(timesteps, dims=[0])
+        else:
+            t = timesteps
+
+        idx = torch.searchsorted(base, t)
+
+        if flipped:
+            idx = (len(self.timesteps) - 1) - idx
+
+        return idx
+
     def set_train_timesteps(
         self,
         num_timesteps,
@@ -116,6 +157,7 @@ class CustomFlowMatchEulerDiscreteScheduler(FlowMatchEulerDiscreteScheduler):
         if timestep_type == 'linear' or timestep_type == 'weighted':
             timesteps = torch.linspace(1000, 1, num_timesteps, device=device)
             self.timesteps = timesteps
+            
             return timesteps
         elif timestep_type == 'sigmoid':
             # distribute them closer to center. Inference distributes them as a bias toward first
@@ -133,10 +175,13 @@ class CustomFlowMatchEulerDiscreteScheduler(FlowMatchEulerDiscreteScheduler):
             return timesteps
         elif timestep_type in ['flux_shift', 'lumina2_shift', 'shift']:
             # matches inference dynamic shifting
-            timesteps = np.linspace(
-                self._sigma_to_t(self.sigma_max), self._sigma_to_t(
-                    self.sigma_min), num_timesteps
-            )
+            timesteps = torch.linspace(
+                self._sigma_to_t(self.sigma_max),
+                self._sigma_to_t(self.sigma_min),
+                num_timesteps,
+                device=device,
+                dtype=torch.float32
+            )            
 
             sigmas = timesteps / self.config.num_train_timesteps
 
@@ -175,21 +220,23 @@ class CustomFlowMatchEulerDiscreteScheduler(FlowMatchEulerDiscreteScheduler):
 
             sigmas = torch.from_numpy(sigmas).to(
                 dtype=torch.float32, device=device)
-            timesteps = sigmas * self.config.num_train_timesteps
 
             if self.config.invert_sigmas:
                 sigmas = 1.0 - sigmas
-                timesteps = sigmas * self.config.num_train_timesteps
-                sigmas = torch.cat(
-                    [sigmas, torch.ones(1, device=sigmas.device)])
-            else:
-                sigmas = torch.cat(
-                    [sigmas, torch.zeros(1, device=sigmas.device)])
 
-            self.timesteps = timesteps.to(device=device)
+            timesteps = sigmas * self.config.num_train_timesteps
+
+            # keep old "extra sigma" behavior, but align lengths
+            sigmas = torch.cat([sigmas, sigmas[-1:]])
+            timesteps = torch.cat([timesteps, timesteps[-1:]])
+
+            # ensure monotonic descending timesteps and aligned sigmas
+            order = torch.argsort(timesteps, descending=True)
+            timesteps = timesteps[order]
+            sigmas = sigmas[order]
+
+            self.timesteps = timesteps
             self.sigmas = sigmas
-
-            self.timesteps = timesteps.to(device=device)
             return timesteps
 
         elif timestep_type == 'lognorm_blend':
