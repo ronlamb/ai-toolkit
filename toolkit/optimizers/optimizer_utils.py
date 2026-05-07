@@ -114,55 +114,66 @@ def get_format_params(dtype: torch.dtype) -> tuple[int, int]:
         raise ValueError(f"Unsupported dtype: {dtype}")
     
 def copy_stochastic_bf16(target: torch.Tensor, source: torch.Tensor):
-    # adapted from https://github.com/Nerogar/OneTrainer/blob/411532e85f3cf2b52baa37597f9c145073d54511/modules/util/bf16_stochastic_rounding.py#L5
-    # create a random 16 bit integer
-    result = torch.randint_like(
-        source,
-        dtype=torch.int32,
-        low=0,
-        high=(1 << 16),
+    # reinterpret FP32 as int32 (zero-copy)
+    src_i32 = torch.bitcast(source, torch.int32)
+
+    # generate 16-bit random noise (one per element)
+    # randint(0, 1<<16) is cheaper than randint_like
+    noise = torch.randint(
+        0, 1 << 16,
+        src_i32.shape,
+        device=src_i32.device,
+        dtype=torch.int32
     )
 
-    # add the random number to the lower 16 bit of the mantissa
-    result.add_(source.view(dtype=torch.int32))
+    # add noise to lower 16 bits
+    rounded = src_i32 + noise
 
-    # mask off the lower 16 bit of the mantissa
-    result.bitwise_and_(-65536)  # -65536 = FFFF0000 as a signed int32
+    # mask off lower 16 bits
+    rounded &= -65536  # 0xFFFF0000
 
-    # copy the higher 16 bit into the target tensor
-    target.copy_(result.view(dtype=torch.float32))
+    # reinterpret back to float32
+    out = torch.bitcast(rounded, torch.float32)
 
-    del result
+    target.copy_(out)
 
 
-def copy_stochastic(target: torch.Tensor, source: torch.Tensor, eps: Optional[float] = None) -> None:
+def copy_stochastic(target: torch.Tensor, source: torch.Tensor, eps=None):
     with torch.no_grad():
-        # assert if target is on cpu, throw error
-        assert target.device.type != 'cpu', "Target is on cpu!"
-        assert source.device.type != 'cpu', "Source is on cpu!"
-        
-        if target.dtype == torch.float32:
+        assert target.device.type != 'cpu'
+        assert source.device.type != 'cpu'
+
+        dt = target.dtype
+
+        # Fast path: FP32 → no rounding needed
+        if dt == torch.float32:
             target.copy_(source)
             return
-        if target.dtype == torch.bfloat16:
+
+        # BF16 path (bit-level stochastic rounding)
+        if dt == torch.bfloat16:
             copy_stochastic_bf16(target, source)
             return
 
-        mantissa_bits, _ = get_format_params(target.dtype)
-        round_factor = 2 ** (23 - mantissa_bits)
+        # ---- FLOAT8 / FP16 stochastic rounding ----
 
-        # Add uniform noise for stochastic rounding
-        noise = torch.rand_like(source, device=source.device) - 0.5
-        rounded = torch.round(source * round_factor + noise)
-        result_float = rounded / round_factor
+        mantissa_bits, _ = get_format_params(dt)
+        round_factor = float(1 << (23 - mantissa_bits))
 
-        # Clamp for float8
-        if target.dtype == torch.float8_e4m3fn:
-            result_float.clamp_(-448.0, 448.0)
-        elif target.dtype == torch.float8_e5m2:
-            result_float.clamp_(-57344.0, 57344.0)
+        # fused stochastic rounding
+        # noise in [-0.5, 0.5)
+        noise = torch.rand_like(source) - 0.5
 
-        update_parameter(target, result_float)
+        # round(source * factor + noise) / factor
+        out = torch.round(source * round_factor + noise) / round_factor
+
+        # clamp for float8
+        if dt == torch.float8_e4m3fn:
+            out.clamp_(-448.0, 448.0)
+        elif dt == torch.float8_e5m2:
+            out.clamp_(-57344.0, 57344.0)
+
+        update_parameter(target, out)
 
 
 class Auto8bitTensor:
