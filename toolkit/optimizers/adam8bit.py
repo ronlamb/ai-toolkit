@@ -161,8 +161,8 @@ class Adam8bit(Optimizer):
                 p_fp32.addcdiv_(exp_avg, denom, value=-step_size)
 
                 # Update state with stochastic rounding
-                state['exp_avg'] = Auto8bitTensor(exp_avg)
-                state['exp_avg_sq'] = Auto8bitTensor(exp_avg_sq)
+                state['exp_avg'].update_from_fp32_(exp_avg)
+                state['exp_avg_sq'].update_from_fp32_(exp_avg_sq)
 
                 # Apply stochastic rounding to parameters
                 copy_stochastic(p.data, p_fp32.data)

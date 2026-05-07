@@ -222,6 +222,16 @@ class Auto8bitTensor:
         self.scale = state_dict['scale']
         self.orig_dtype = state_dict['orig_dtype']
 
+    def update_from_fp32_(self, data: torch.Tensor):
+        # assumes data is fp32 EMA result
+        abs_max = data.abs().max().item()
+        self.scale = abs_max / 127.0 if abs_max > 0 else 1.0
+        self.inv_scale = 1.0 / self.scale
+        q = (data * self.inv_scale).round().clamp(-127, 127)
+        self.quantized.copy_(q.to(torch.int8))
+        # optional: reset cache if you want strictness
+        self._fp32_cache = None
+        
     def __str__(self):
         return f"Auto8bitTensor({self.dequantize()})"
 
