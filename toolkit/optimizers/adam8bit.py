@@ -135,8 +135,12 @@ class Adam8bit(Optimizer):
                 exp_avg_sq = state['exp_avg_sq_fp32']
 
                 # Load 8‑bit values into FP32 buffers only once per step
-                exp_avg.copy_(state['exp_avg'].to(torch.float32))
-                exp_avg_sq.copy_(state['exp_avg_sq'].to(torch.float32))
+                # Load EMAs as FP32 for math (explicit dequantize, no .to() dispatch)
+                exp_avg = state['exp_avg'].dequantize()
+                exp_avg_sq = state['exp_avg_sq'].dequantize()
+
+                # exp_avg.copy_(state['exp_avg'].to(torch.float32))
+                # exp_avg_sq.copy_(state['exp_avg_sq'].to(torch.float32))
 
                 # Step count
                 state['step'] = step
