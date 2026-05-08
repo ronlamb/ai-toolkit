@@ -222,16 +222,34 @@ class Auto8bitTensor:
         self.scale = state_dict['scale']
         self.orig_dtype = state_dict['orig_dtype']
 
-    def update_from_fp32_(self, data: torch.Tensor):
-        # assumes data is fp32 EMA result
-        abs_max = data.abs().max().item()
-        self.scale = abs_max / 127.0 if abs_max > 0 else 1.0
-        self.inv_scale = 1.0 / self.scale
-        q = (data * self.inv_scale).round().clamp(-127, 127)
-        self.quantized.copy_(q.to(torch.int8))
-        # optional: reset cache if you want strictness
-        self._fp32_cache = None
-        
+    def update_from_fp32_(self, data: torch.Tensor, *, fused=False, scale_eps=1e-6):
+        """
+        Update quantized EMA in-place from an fp32 tensor.
+        If fused=True, skip redundant work and assume `data` is already updated EMA.
+        """
+
+        # Compute new abs max on GPU
+        new_abs_max = data.abs().amax()
+
+        if new_abs_max == 0:
+            self.quantized.zero_()
+            self._fp32_cache = None
+            return
+
+        new_scale = new_abs_max / 127.0
+
+        # Only update scale if needed
+        if torch.abs(new_scale - self.scale) > (self.scale * scale_eps):
+            self.scale = float(new_scale)
+            self.inv_scale = 1.0 / self.scale
+
+        # Quantize in-place
+        q = (data * self.inv_scale).round().clamp(-127, 127).to(torch.int8)
+        self.quantized.copy_(q)
+
+        # Reset cache
+        self._fp32_cache = None        
+
     def __str__(self):
         return f"Auto8bitTensor({self.dequantize()})"
 
