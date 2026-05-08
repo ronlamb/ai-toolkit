@@ -100,21 +100,6 @@ Also the smoothed loss at 10 steps granularity the graph stabilized at .43 or so
 17%|#6        | 3399/20000 [2:07:45<10:23:59,  2.26s/it, lr: 8.0e-05 loss: 2.561e-01]
 18%|#7        | 3599/20000 [2:15:13<10:16:15,  2.25s/it, lr: 8.0e-05 loss: 5.969e-01]
 
----- update_from_fp32_ added
-
-1%|          | 199/20000 [07:37<12:38:43,  2.30s/it, lr: 8.0e-05 loss: 4.862e-01]
-2%|1         | 399/20000 [15:10<12:25:51,  2.28s/it, lr: 8.0e-05 loss: 2.972e-01]
-3%|2         | 599/20000 [22:45<12:17:16,  2.28s/it, lr: 8.0e-05 loss: 3.378e-01]
-4%|3         | 799/20000 [30:20<12:09:11,  2.28s/it, lr: 8.0e-05 loss: 2.725e-01]
-5%|4         | 999/20000 [37:54<12:00:58,  2.28s/it, lr: 8.0e-05 loss: 4.062e-01]
-6%|5         | 1199/20000 [45:28<11:53:04,  2.28s/it, lr: 8.0e-05 loss: 5.248e-01]
-7%|6         | 1399/20000 [53:02<11:45:08,  2.27s/it, lr: 8.0e-05 loss: 5.117e-01]
-8%|7         | 1599/20000 [1:00:35<11:37:18,  2.27s/it, lr: 8.0e-05 loss: 4.194e-01]
-9%|8         | 1799/20000 [1:08:09<11:29:34,  2.27s/it, lr: 8.0e-05 loss: 4.072e-01]
-10%|9         | 1999/20000 [1:15:43<11:21:51,  2.27s/it, lr: 8.0e-05 loss: 4.903e-01]
-11%|#         | 2199/20000 [1:23:17<11:14:14,  2.27s/it, lr: 8.0e-05 loss: 3.951e-01]
-12%|#1        | 2399/20000 [1:30:51<11:06:38,  2.27s/it, lr: 8.0e-05 loss: 3.341e-01]
-
 --- fixed
 
 1%|          | 199/20000 [07:36<12:37:46,  2.30s/it, lr: 8.0e-05 loss: 5.687e-01]
@@ -132,3 +117,44 @@ Also the smoothed loss at 10 steps granularity the graph stabilized at .43 or so
 13%|#2        | 2599/20000 [1:37:37<10:53:35,  2.25s/it, lr: 8.0e-05 loss: 3.390e-01]
 14%|#3        | 2799/20000 [1:45:06<10:45:54,  2.25s/it, lr: 8.0e-05 loss: 4.316e-01]
 15%|#4        | 2999/20000 [1:52:44<10:39:06,  2.26s/it, lr: 8.0e-05 loss: 3.105e-01]
+16%|#5        | 3199/20000 [2:00:16<10:31:43,  2.26s/it, lr: 8.0e-05 loss: 5.070e-01]
+17%|#6        | 3399/20000 [2:07:49<10:24:18,  2.26s/it, lr: 8.0e-05 loss: 4.048e-01]
+18%|#7        | 3599/20000 [2:15:19<10:16:39,  2.26s/it, lr: 8.0e-05 loss: 3.001e-01]
+
+--- fp16
+
+1%|          | 199/20000 [07:37<12:39:03,  2.30s/it, lr: 8.0e-05 loss: 4.639e-01]
+2%|1         | 399/20000 [15:12<12:27:05,  2.29s/it, lr: 8.0e-05 loss: 4.674e-01]
+3%|2         | 599/20000 [22:46<12:17:31,  2.28s/it, lr: 8.0e-05 loss: 5.693e-01]
+4%|3         | 799/20000 [30:19<12:08:54,  2.28s/it, lr: 8.0e-05 loss: 5.687e-01]
+5%|4         | 999/20000 [37:57<12:01:55,  2.28s/it, lr: 8.0e-05 loss: 3.380e-01]
+6%|5         | 1199/20000 [45:31<11:53:52,  2.28s/it, lr: 8.0e-05 loss: 3.412e-01]
+epoch 6 18.8GB first 60 steps then to 20.2 the rest.
+7%|6         | 1399/20000 [53:04<11:45:46,  2.28s/it, lr: 8.0e-05 loss: 2.940e-01]
+8%|7         | 1599/20000 [1:00:38<11:37:53,  2.28s/it, lr: 8.0e-05 loss: 5.609e-01]
+9%|8         | 1799/20000 [1:08:13<11:30:19,  2.28s/it, lr: 8.0e-05 loss: 4.319e-01]
+
+----
+Much better at start.  Got to around 21 first epoch, not sure how high it got because I left the room before it finished.
+1%|          | 199/20000 [07:37<12:38:33,  2.30s/it, lr: 8.0e-05 loss: 3.618e-01]
+2%|1         | 399/20000 [15:11<12:26:12,  2.28s/it, lr: 8.0e-05 loss: 4.504e-01]
+3%|2         | 599/20000 [22:46<12:17:28,  2.28s/it, lr: 8.0e-05 loss: 3.251e-01]
+I skipped the second epoch analysis since it usually is negligible
+Third epoch steadily rose from 20.6 to 21.3 first 70 steps then tapered off until it maxed at 21.8
+Image convergence much better and so far is as expected 
+
+
+Spiked immediately to 22.3GB and stayed steady throughout the 1st 150 step in epoch 1 until it hit 22.4GB last 50 or so steps
+This was fairly common the first 4 epochs.
+1%|          | 199/20000 [07:40<12:42:53,  2.31s/it, lr: 8.0e-05 loss: 4.220e-01]
+2%|1         | 399/20000 [15:14<12:28:38,  2.29s/it, lr: 8.0e-05 loss: 4.378e-01]
+3%|2         | 599/20000 [22:48<12:18:42,  2.28s/it, lr: 8.0e-05 loss: 3.379e-01]
+4%|3         | 799/20000 [30:22<12:10:07,  2.28s/it, lr: 8.0e-05 loss: 3.926e-01]
+
+Epochs 5 onward, so far stayed mostly in the 19.4GB to 19.6GB range, unfortunately it didn't dip below 2.28 seconds the first 10 epochs
+Convergence was also a bit rougher so far.  Seemed to flip a bit, learned more, losing a bit in the next epoch. Image quality is also a bit less.
+
+5%|4         | 999/20000 [37:59<12:02:43,  2.28s/it, lr: 8.0e-05 loss: 4.909e-01]
+6%|5         | 1199/20000 [45:34<11:54:32,  2.28s/it, lr: 8.0e-05 loss: 5.916e-01]
+7%|6         | 1399/20000 [53:08<11:46:35,  2.28s/it, lr: 8.0e-05 loss: 6.099e-01]
+

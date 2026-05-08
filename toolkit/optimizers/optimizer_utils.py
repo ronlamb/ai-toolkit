@@ -189,7 +189,10 @@ class Auto8bitTensor:
             self.orig_dtype = data.dtype
 
     def dequantize(self) -> Tensor:
-        return self.quantized.to(dtype=torch.float32) * self.scale
+        if self._fp32_cache is None:
+            # store cache in fp16 to reduce VRAM
+            self._fp32_cache = self.quantized.to(torch.float16) * self.scale
+        return self._fp32_cache
 
     def to(self, *args, **kwargs):
         # Handle the dtype argument whether it's positional or keyword
@@ -222,33 +225,58 @@ class Auto8bitTensor:
         self.scale = state_dict['scale']
         self.orig_dtype = state_dict['orig_dtype']
 
-    def update_from_fp32_(self, data: torch.Tensor, *, fused=False, scale_eps=1e-6):
+    def update_from_fp32_(self, data: torch.Tensor, *, fused=False, beta=None, grad=None, scale_eps=1e-6):
         """
-        Update quantized EMA in-place from an fp32 tensor.
-        If fused=True, skip redundant work and assume `data` is already updated EMA.
+        If fused=True, perform EMA update + quantization in a single pass.
+        Otherwise, behave like the normal path.
         """
 
-        # Compute new abs max on GPU
+        if not fused:
+            # Normal path (Step 4 behavior)
+            new_abs_max = data.abs().amax()
+            if new_abs_max == 0:
+                self.quantized.zero_()
+                self._fp32_cache = None
+                return
+
+            new_scale = new_abs_max / 127.0
+            if torch.abs(new_scale - self.scale) > (self.scale * scale_eps):
+                self.scale = float(new_scale)
+                self.inv_scale = 1.0 / self.scale
+
+            q = (data * self.inv_scale).round().clamp(-127, 127).to(torch.int8)
+            self.quantized.copy_(q)
+            self._fp32_cache = None
+            return
+
+        # -----------------------------
+        # FUSED PATH (EMA + quantize)
+        # -----------------------------
+        # data is the *old* EMA (fp32)
+        # grad is the current gradient (fp32)
+        # beta is beta1 or beta2 depending on which EMA this is
+
+        # Compute updated EMA directly into `data`
+        data.mul_(beta).add_(grad, alpha=1 - beta)
+
+        # Compute new scale
         new_abs_max = data.abs().amax()
-
         if new_abs_max == 0:
             self.quantized.zero_()
             self._fp32_cache = None
             return
 
         new_scale = new_abs_max / 127.0
-
-        # Only update scale if needed
         if torch.abs(new_scale - self.scale) > (self.scale * scale_eps):
             self.scale = float(new_scale)
             self.inv_scale = 1.0 / self.scale
 
-        # Quantize in-place
+        # Quantize directly from updated EMA
         q = (data * self.inv_scale).round().clamp(-127, 127).to(torch.int8)
         self.quantized.copy_(q)
 
-        # Reset cache
-        self._fp32_cache = None        
+        # Clear cache
+        self._fp32_cache = None
 
     def __str__(self):
         return f"Auto8bitTensor({self.dequantize()})"
