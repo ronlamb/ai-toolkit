@@ -139,22 +139,120 @@ Much better at start.  Got to around 21 first epoch, not sure how high it got be
 1%|          | 199/20000 [07:37<12:38:33,  2.30s/it, lr: 8.0e-05 loss: 3.618e-01]
 2%|1         | 399/20000 [15:11<12:26:12,  2.28s/it, lr: 8.0e-05 loss: 4.504e-01]
 3%|2         | 599/20000 [22:46<12:17:28,  2.28s/it, lr: 8.0e-05 loss: 3.251e-01]
+4%|3         | 799/20000 [30:21<12:09:29,  2.28s/it, lr: 8.0e-05 loss: 3.852e-01]
 I skipped the second epoch analysis since it usually is negligible
 Third epoch steadily rose from 20.6 to 21.3 first 70 steps then tapered off until it maxed at 21.8
 Image convergence much better and so far is as expected 
 
+Fourth epoch it stayed steady at 21.2 first 60 then steadily to 21.8.  Also epochs samples look much better. Epochs 3 and 4 are the best I have seen yet.  
+I'll let it run for an hour and come back and then look at VRAM after a long run and samples. 
 
-Spiked immediately to 22.3GB and stayed steady throughout the 1st 150 step in epoch 1 until it hit 22.4GB last 50 or so steps
-This was fairly common the first 4 epochs.
-1%|          | 199/20000 [07:40<12:42:53,  2.31s/it, lr: 8.0e-05 loss: 4.220e-01]
-2%|1         | 399/20000 [15:14<12:28:38,  2.29s/it, lr: 8.0e-05 loss: 4.378e-01]
-3%|2         | 599/20000 [22:48<12:18:42,  2.28s/it, lr: 8.0e-05 loss: 3.379e-01]
-4%|3         | 799/20000 [30:22<12:10:07,  2.28s/it, lr: 8.0e-05 loss: 3.926e-01]
+Here is about a 2 hour run including sample generation
 
-Epochs 5 onward, so far stayed mostly in the 19.4GB to 19.6GB range, unfortunately it didn't dip below 2.28 seconds the first 10 epochs
-Convergence was also a bit rougher so far.  Seemed to flip a bit, learned more, losing a bit in the next epoch. Image quality is also a bit less.
+5%|4         | 999/20000 [37:56<12:01:39,  2.28s/it, lr: 8.0e-05 loss: 5.043e-01]
+6%|5         | 1199/20000 [45:31<11:53:52,  2.28s/it, lr: 8.0e-05 loss: 5.671e-01]
+7%|6         | 1399/20000 [53:04<11:45:45,  2.28s/it, lr: 8.0e-05 loss: 3.589e-01]
+8%|7         | 1599/20000 [1:00:38<11:37:51,  2.28s/it, lr: 8.0e-05 loss: 3.601e-01]
 
-5%|4         | 999/20000 [37:59<12:02:43,  2.28s/it, lr: 8.0e-05 loss: 4.909e-01]
-6%|5         | 1199/20000 [45:34<11:54:32,  2.28s/it, lr: 8.0e-05 loss: 5.916e-01]
-7%|6         | 1399/20000 [53:08<11:46:35,  2.28s/it, lr: 8.0e-05 loss: 6.099e-01]
+Epoch 9 started at 21.1 and basically it's stayed around 21.0 to 21.4 throughout each successive epoch.
+9%|8         | 1799/20000 [1:08:12<11:30:05,  2.27s/it, lr: 8.0e-05 loss: 4.265e-01]
+10%|9         | 1999/20000 [1:15:46<11:22:20,  2.27s/it, lr: 8.0e-05 loss: 5.550e-01]
+11%|#         | 2199/20000 [1:23:20<11:14:35,  2.27s/it, lr: 8.0e-05 loss: 5.743e-01]
+12%|#1        | 2399/20000 [1:30:50<11:06:30,  2.27s/it, lr: 8.0e-05 loss: 2.806e-01]
+13%|#2        | 2599/20000 [1:38:19<10:58:18,  2.27s/it, lr: 8.0e-05 loss: 5.272e-01]
+14%|#3        | 2799/20000 [1:45:55<10:50:58,  2.27s/it, lr: 8.0e-05 loss: 4.520e-01]
+
+1%|          | 199/20000 [07:43<12:48:59,  2.33s/it, lr: 8.0e-05 loss: 5.711e-01]
+2%|1         | 399/20000 [15:22<12:35:35,  2.31s/it, lr: 8.0e-05 loss: 5.409e-01]
+3%|2         | 599/20000 [23:08<12:29:31,  2.32s/it, lr: 8.0e-05 loss: 5.846e-01]
+4%|3         | 799/20000 [30:55<12:23:16,  2.32s/it, lr: 8.0e-05 loss: 6.518e-01]
+5%|4         | 999/20000 [38:28<12:11:39,  2.31s/it, lr: 8.0e-05 loss: 3.226e-01]
+6%|5         | 1199/20000 [46:00<12:01:24,  2.30s/it, lr: 8.0e-05 loss: 3.713e-01]
+7%|6         | 1399/20000 [53:32<11:51:48,  2.30s/it, lr: 8.0e-05 loss: 6.209e-01]
+8%|7         | 1599/20000 [1:01:03<11:42:38,  2.29s/it, lr: 8.0e-05 loss: 3.961e-01]
+9%|8         | 1799/20000 [1:08:33<11:33:33,  2.29s/it, lr: 8.0e-05 loss: 5.233e-01]
+10%|9         | 1999/20000 [1:16:02<11:24:43,  2.28s/it, lr: 8.0e-05 loss: 3.400e-01]
+11%|#         | 2199/20000 [1:23:31<11:16:05,  2.28s/it, lr: 8.0e-05 loss: 5.496e-01]
+12%|#1        | 2399/20000 [1:30:59<11:07:38,  2.28s/it, lr: 8.0e-05 loss: 5.302e-01]
+13%|#2        | 2599/20000 [1:38:28<10:59:21,  2.27s/it, lr: 8.0e-05 loss: 3.636e-01]
+14%|#3        | 2799/20000 [1:45:57<10:51:12,  2.27s/it, lr: 8.0e-05 loss: 2.908e-01]
+15%|#4        | 2999/20000 [1:53:27<10:43:09,  2.27s/it, lr: 8.0e-05 loss: 4.126e-01]
+16%|#5        | 3199/20000 [2:00:56<10:35:09,  2.27s/it, lr: 8.0e-05 loss: 4.536e-01]
+
+---
+started at 18.6 and for 5 incremented up at around .2Gb steps until it sayed steady at to 19.7 until it hit epoch 40 then it was 21.1 until the end.
+
+1%|          | 199/20000 [07:39<12:42:39,  2.31s/it, lr: 8.0e-05 loss: 5.004e-01]
+2%|1         | 399/20000 [15:15<12:29:20,  2.29s/it, lr: 8.0e-05 loss: 5.486e-01]
+
+This first epoch actually showed 2.30s/it a few times but ended at 2.31
+Image generation started at 21.6GB for image 1 then dropped to 19.9 gb at image 2 to 6 then 2.2 at image 7.  Image 1 and 7 are 1024x1024, the rest are 1216x832
+
+Epoch 2 started at 21.1GB and stayed there throughout. First 100 steps of epoch 2 stayed at 2.31 and then dipped to 2.30, and finally 2.29 at step 367 or so. 
+Image generation again started at 21.6 and dropped to 19.9 that it is apparent memory utilization is stable, so stopped watching at this point.
+
+I'll come back in about 20 minutes to see where it is.
+
+Here are the next 5 epochs
+3%|2         | 599/20000 [22:49<12:19:23,  2.29s/it, lr: 8.0e-05 loss: 3.253e-01]
+4%|3         | 799/20000 [30:23<12:10:21,  2.28s/it, lr: 8.0e-05 loss: 3.506e-01]
+5%|4         | 999/20000 [37:52<12:00:22,  2.27s/it, lr: 8.0e-05 loss: 4.223e-01]
+6%|5         | 1199/20000 [45:25<11:52:22,  2.27s/it, lr: 8.0e-05 loss: 4.801e-01]
+7%|6         | 1399/20000 [53:01<11:45:05,  2.27s/it, lr: 8.0e-05 loss: 5.383e-01]
+
+Epoch 6 peaked at 20.6GB VRAM
+Image generation started at 21.7 then 20.0 and then back to 21.7.  Images converges decently, 4 out 7 were 70% or better likeness.
+
+One wierd thing I noticed is that the images 3 and 7 looked to a bit airbrushed or glossy starting at epoch 3.  This wouldn't usually start happening until at least epoch 10-15, and more to image 7.  Epoch 1 - 7 should still be almost photographic looking, not magazine glossy.  It should go back to more non magazine glossy later if it keeps to how the other runs acted.  Image 3 wouldn't usually get magazine glossy looking until around epoch 30.  Image 6 for some reason looked really bad, like it was badly compressed.  This happened in other versions, but usually by epoch 7 it was better.  In this run it was more apparent.
+
+Epoch 7 stayed steady at 21.2GB VRAM.  Image converged a bit more.  5 out of 7 were 70% or better likeness.  
+Image generation was 21.8, 20.0 and 21.8.  looks like memory usage for image generation went up slightly.
+
+
+8%|7         | 1599/20000 [1:00:36<11:37:29,  2.27s/it, lr: 8.0e-05 loss: 3.683e-01]
+9%|8         | 1799/20000 [1:08:11<11:29:50,  2.27s/it, lr: 8.0e-05 loss: 2.965e-01]
+10%|9         | 1999/20000 [1:15:47<11:22:34,  2.28s/it, lr: 8.0e-05 loss: 5.516e-01]
+11%|#         | 2199/20000 [1:23:22<11:14:55,  2.27s/it, lr: 8.0e-05 loss: 2.880e-01]
+12%|#1        | 2399/20000 [1:30:55<11:07:08,  2.27s/it, lr: 8.0e-05 loss: 4.549e-01]
+13%|#2        | 2599/20000 [1:38:30<10:59:32,  2.27s/it, lr: 8.0e-05 loss: 3.471e-01]
+14%|#3        | 2799/20000 [1:46:03<10:51:43,  2.27s/it, lr: 8.0e-05 loss: 5.328e-01]
+15%|#4        | 2999/20000 [1:53:35<10:43:56,  2.27s/it, lr: 8.0e-05 loss: 3.879e-01]
+16%|#5        | 3199/20000 [2:01:04<10:35:51,  2.27s/it, lr: 8.0e-05 loss: 4.729e-01]
+17%|#6        | 3399/20000 [2:08:33<10:27:51,  2.27s/it, lr: 8.0e-05 loss: 6.148e-01]
+18%|#7        | 3599/20000 [2:16:02<10:19:55,  2.27s/it, lr: 8.0e-05 loss: 4.033e-01]
+19%|#8        | 3799/20000 [2:23:30<10:12:00,  2.27s/it, lr: 8.0e-05 loss: 5.421e-01]
+20%|#9        | 3999/20000 [2:30:59<10:04:08,  2.27s/it, lr: 8.0e-05 loss: 4.127e-01]
+21%|##        | 4199/20000 [2:38:29<9:56:23,  2.26s/it, lr: 8.0e-05 loss: 4.914e-01]
+22%|##1       | 4399/20000 [2:46:01<9:48:47,  2.26s/it, lr: 8.0e-05 loss: 3.700e-01]
+23%|##2       | 4599/20000 [2:53:33<9:41:11,  2.26s/it, lr: 8.0e-05 loss: 3.138e-01]
+24%|##3       | 4799/20000 [3:01:01<9:33:25,  2.26s/it, lr: 8.0e-05 loss: 4.089e-01]
+25%|##4       | 4999/20000 [3:08:33<9:25:49,  2.26s/it, lr: 8.0e-05 loss: 5.536e-01]
+26%|##5       | 5199/20000 [3:16:06<9:18:17,  2.26s/it, lr: 8.0e-05 loss: 5.276e-01]
+27%|##6       | 5399/20000 [3:23:37<9:10:42,  2.26s/it, lr: 8.0e-05 loss: 3.458e-01]
+28%|##7       | 5599/20000 [3:31:11<9:03:12,  2.26s/it, lr: 8.0e-05 loss: 6.089e-01]
+29%|##8       | 5799/20000 [3:38:44<8:55:39,  2.26s/it, lr: 8.0e-05 loss: 3.347e-01]
+30%|##9       | 5999/20000 [3:46:16<8:48:05,  2.26s/it, lr: 8.0e-05 loss: 4.689e-01]
+31%|###       | 6199/20000 [3:53:48<8:40:31,  2.26s/it, lr: 8.0e-05 loss: 5.102e-01]
+32%|###1      | 6399/20000 [4:01:20<8:32:58,  2.26s/it, lr: 8.0e-05 loss: 5.580e-01]
+33%|###2      | 6599/20000 [4:08:52<8:25:24,  2.26s/it, lr: 8.0e-05 loss: 5.622e-01]
+34%|###3      | 6799/20000 [4:16:24<8:17:50,  2.26s/it, lr: 8.0e-05 loss: 3.573e-01]
+35%|###4      | 6999/20000 [4:23:57<8:10:18,  2.26s/it, lr: 8.0e-05 loss: 3.620e-01]
+36%|###5      | 7199/20000 [4:31:29<8:02:45,  2.26s/it, lr: 8.0e-05 loss: 5.241e-01]
+37%|###6      | 7399/20000 [4:39:01<7:55:11,  2.26s/it, lr: 8.0e-05 loss: 3.739e-01]
+38%|###7      | 7599/20000 [4:46:33<7:47:38,  2.26s/it, lr: 8.0e-05 loss: 5.307e-01]
+39%|###8      | 7799/20000 [4:54:05<7:40:05,  2.26s/it, lr: 8.0e-05 loss: 4.138e-01]
+40%|###9      | 7999/20000 [5:01:37<7:32:31,  2.26s/it, lr: 8.0e-05 loss: 4.431e-01]
+41%|####      | 8199/20000 [5:09:10<7:24:59,  2.26s/it, lr: 8.0e-05 loss: 4.868e-01]
+42%|####1     | 8399/20000 [5:16:42<7:17:26,  2.26s/it, lr: 8.0e-05 loss: 4.257e-01]
+43%|####2     | 8599/20000 [5:24:11<7:09:49,  2.26s/it, lr: 8.0e-05 loss: 5.616e-01]
+44%|####3     | 8799/20000 [5:31:40<7:02:12,  2.26s/it, lr: 8.0e-05 loss: 4.854e-01]
+45%|####4     | 8999/20000 [5:39:08<6:54:35,  2.26s/it, lr: 8.0e-05 loss: 3.370e-01]
+46%|####5     | 9199/20000 [5:46:37<6:46:59,  2.26s/it, lr: 8.0e-05 loss: 3.864e-01]
+47%|####6     | 9399/20000 [5:54:06<6:39:23,  2.26s/it, lr: 8.0e-05 loss: 2.763e-01]
+48%|####7     | 9599/20000 [6:01:38<6:31:51,  2.26s/it, lr: 8.0e-05 loss: 5.489e-01]
+49%|####8     | 9799/20000 [6:09:12<6:24:21,  2.26s/it, lr: 8.0e-05 loss: 5.547e-01]
+50%|####9     | 9999/20000 [6:16:44<6:16:49,  2.26s/it, lr: 8.0e-05 loss: 5.521e-01]
+
+
+
 

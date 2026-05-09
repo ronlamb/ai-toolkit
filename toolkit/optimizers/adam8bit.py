@@ -75,15 +75,18 @@ def step(self, closure=None):
         decay = group['weight_decay']
         decouple = group['decouple']
 
+        # group-level step
         if 'step' not in group:
             group['step'] = 0
         group['step'] += 1
         step = group['step']
 
-        bias_correction1 = 1 - beta1 ** step
-        bias_correction2 = 1 - beta2 ** step
-        step_size = lr / bias_correction1
-        bias_correction2_sqrt = math.sqrt(bias_correction2)
+        # fused bias correction
+        bc1 = 1.0 - beta1 ** step
+        bc2 = 1.0 - beta2 ** step
+        inv_bc1 = 1.0 / bc1
+        inv_bc2_sqrt = 1.0 / math.sqrt(bc2)
+        step_size = lr * inv_bc1
 
         for p in group['params']:
             if p.grad is None:
@@ -99,6 +102,10 @@ def step(self, closure=None):
                 state['step'] = 0
                 state['fp32_buffer'] = torch.zeros_like(p, dtype=torch.float32)
 
+                # persistent fp32 EMA buffers
+                state['exp_avg_fp32'] = torch.zeros_like(p, dtype=torch.float32)
+                state['exp_avg_sq_fp32'] = torch.zeros_like(p, dtype=torch.float32)
+
                 state['exp_avg'] = Auto8bitTensor(
                     torch.zeros_like(state['fp32_buffer'])
                 )
@@ -109,31 +116,37 @@ def step(self, closure=None):
             p_fp32 = state['fp32_buffer']
             p_fp32.copy_(p, non_blocking=True)
 
-            # Dequantize EMAs once per step
-            exp_avg = state['exp_avg'].dequantize().to(torch.float32)
-            exp_avg_sq = state['exp_avg_sq'].dequantize().to(torch.float32)
+            # reuse fp32 EMA buffers (no new allocations)
+            exp_avg = state['exp_avg_fp32']
+            exp_avg.copy_(state['exp_avg'].dequantize(), non_blocking=True)
+
+            exp_avg_sq = state['exp_avg_sq_fp32']
+            exp_avg_sq.copy_(state['exp_avg_sq'].dequantize(), non_blocking=True)
 
             state['step'] = step
 
-            # Fused EMA + quantization updates (update EMA for *this* step)
-            state['exp_avg'].update_from_fp32_(exp_avg, fused=True, beta=beta1, grad=grad)
-            state['exp_avg_sq'].update_from_fp32_(exp_avg_sq, fused=True, beta=beta2, grad=grad * grad)
+            # fused EMA + quantization (first and second moments)
+            state['exp_avg'].update_from_fp32_(
+                exp_avg, fused=True, beta=beta1, grad=grad
+            )
+            state['exp_avg_sq'].update_from_fp32_(
+                exp_avg_sq, fused=True, beta=beta2, grad=grad  # grad² fused inside
+            )
 
-            # Decoupled weight decay
+            # decoupled weight decay
             if decay != 0 and decouple:
                 p_fp32.mul_(1 - lr * decay)
 
-            # Bias-corrected denom using the updated exp_avg_sq
-            denom = exp_avg_sq.sqrt().div_(bias_correction2_sqrt).add_(eps)
+            # denom in-place: sqrt, bias correction, +eps
+            exp_avg_sq.sqrt_().mul_(inv_bc2_sqrt).add_(eps)
 
-            # Parameter update
-            p_fp32.addcdiv_(exp_avg, denom, value=-step_size)
+            # parameter update (uses exp_avg_sq as denom)
+            p_fp32.addcdiv_(exp_avg, exp_avg_sq, value=-step_size)
 
-            # Stochastic rounding to parameters
+            # stochastic rounding to parameters
             copy_stochastic(p.data, p_fp32.data)
 
     return loss
-
     
     def state_dict(self):
         """Returns the state of the optimizer as a dict."""
