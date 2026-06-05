@@ -186,3 +186,6 @@ aitk_db.db
 /data
 .claude
 .continue
+
+.github/prompts/*
+.github/prompts/initial-prompt.md
