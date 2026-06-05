@@ -435,7 +435,8 @@ class ChromaModel(BaseModel):
         for k, v in state_dict.items():
             if isinstance(v, QTensor):
                 v = v.dequantize()
-            save_dict[k] = v.clone().to('cpu', dtype=save_dtype)
+            # Remove redundant .clone() - .to() already creates a copy when changing device/dtype
+            save_dict[k] = v.to('cpu', dtype=save_dtype)
         
         meta = get_meta_for_safetensors(meta, name='chroma')
         save_file(save_dict, output_path, metadata=meta)
