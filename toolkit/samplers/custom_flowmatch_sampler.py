@@ -65,11 +65,6 @@ class CustomFlowMatchEulerDiscreteScheduler(FlowMatchEulerDiscreteScheduler):
 
         # Get the weights for the timesteps
         if timestep_type == "weighted":
-            # weights = torch.tensor(
-            #     [default_weighing_scheme[i] for i in step_indices],
-            #     device=timesteps.device,
-            #     dtype=timesteps.dtype
-            # )
             weights = self.default_weighing_tensor[step_indices].to(device=timesteps.device, dtype=timesteps.dtype)
         
         elif v2:
@@ -85,18 +80,6 @@ class CustomFlowMatchEulerDiscreteScheduler(FlowMatchEulerDiscreteScheduler):
         return weights
 
     def get_sigmas(self, timesteps: torch.Tensor, n_dim, dtype, device) -> torch.Tensor:
-        # sigmas = self.sigmas.to(device=device, dtype=dtype)
-        # schedule_timesteps = self.timesteps.to(device)
-        # timesteps = timesteps.to(device)
-        # step_indices = [(schedule_timesteps == t).nonzero().item()
-        #                 for t in timesteps]
-
-        # sigma = sigmas[step_indices].flatten()
-        # while len(sigma.shape) < n_dim:
-        #     sigma = sigma.unsqueeze(-1)
-
-        # return sigma
-
         step_indices = self._get_step_indices(timesteps.to(self.timesteps.device))
         sigmas = self.sigmas[step_indices].to(device=device, dtype=dtype)
 
@@ -115,7 +98,6 @@ class CustomFlowMatchEulerDiscreteScheduler(FlowMatchEulerDiscreteScheduler):
         # forward ODE
         noisy_model_input = (1.0 - t_01) * original_samples + t_01 * noise
         # reverse ODE
-        # noisy_model_input = (1 - t_01) * noise + t_01 * original_samples
         return noisy_model_input
 
     def scale_model_input(self, sample: torch.Tensor, timestep: Union[float, torch.Tensor]) -> torch.Tensor:
