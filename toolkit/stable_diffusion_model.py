@@ -1135,6 +1135,10 @@ class StableDiffusion:
         network = unwrap_model(self.network)
         merge_multiplier = 1.0
         flush()
+        
+        # Cache pipeline for reuse between generate_images() calls (Change #4)
+        if not hasattr(self, '_cached_pipeline') or self._cached_pipeline is None:
+            self._cached_pipeline = pipeline
         # if using assistant, unfuse it
         if self.model_config.assistant_lora_path is not None:
             print_acc("Unloading assistant lora")
@@ -1367,9 +1371,32 @@ class StableDiffusion:
         # pipeline.to(self.device_torch)
 
         with network:
-            with torch.no_grad():
+            # Use torch.inference_mode() for better performance in evaluation mode
+            with torch.inference_mode():
                 if network is not None:
                     assert network.is_active
+
+                # Batch encode prompts before the loop (Change #3)
+                # This moves prompt encoding outside the main generation loop for better performance
+                # Adapter state management (is_unconditional_run) is preserved here during pre-encoding
+                prompt_cache = {}
+                if self.sample_prompts_cache is None:
+                    for i, gen_config in enumerate(image_configs):
+                        # encode the prompt ourselves so we can do fun stuff with embeddings
+                        if isinstance(self.adapter, CustomAdapter):
+                            self.adapter.is_unconditional_run = False
+                        conditional_embeds = self.encode_prompt(gen_config.prompt, gen_config.prompt_2, force_all=True)
+
+                        if isinstance(self.adapter, CustomAdapter):
+                            self.adapter.is_unconditional_run = True
+                        unconditional_embeds = self.encode_prompt(
+                            gen_config.negative_prompt, gen_config.negative_prompt_2, force_all=True
+                        )
+                        
+                        prompt_cache[i] = {
+                            'conditional': conditional_embeds,
+                            'unconditional': unconditional_embeds
+                        }
 
                 for i in tqdm(range(len(image_configs)), desc=f"Generating Images", leave=False):
                     gen_config = image_configs[i]
@@ -1455,18 +1482,10 @@ class StableDiffusion:
                         conditional_embeds = self.sample_prompts_cache[i]['conditional'].to(self.device_torch, dtype=self.torch_dtype)
                         unconditional_embeds = self.sample_prompts_cache[i]['unconditional'].to(self.device_torch, dtype=self.torch_dtype)
                     else: 
-                        # encode the prompt ourselves so we can do fun stuff with embeddings
-                        if isinstance(self.adapter, CustomAdapter):
-                            self.adapter.is_unconditional_run = False
-                        conditional_embeds = self.encode_prompt(gen_config.prompt, gen_config.prompt_2, force_all=True)
-
-                        if isinstance(self.adapter, CustomAdapter):
-                            self.adapter.is_unconditional_run = True
-                        unconditional_embeds = self.encode_prompt(
-                            gen_config.negative_prompt, gen_config.negative_prompt_2, force_all=True
-                        )
-                        if isinstance(self.adapter, CustomAdapter):
-                            self.adapter.is_unconditional_run = False
+                        # Use cached prompts from batch encoding (Change #3)
+                        # These were pre-encoded before the loop with proper adapter state management
+                        conditional_embeds = prompt_cache[i]['conditional']
+                        unconditional_embeds = prompt_cache[i]['unconditional']
 
                     # allow any manipulations to take place to embeddings
                     gen_config.post_process_embeddings(

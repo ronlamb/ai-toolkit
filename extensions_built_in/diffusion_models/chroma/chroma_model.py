@@ -148,7 +148,9 @@ class ChromaModel(BaseModel):
 
         self.print_and_status_update("Loading transformer")
         
-        chroma_state_dict = load_file(model_path, 'cpu')
+        # Load directly to device if not quantizing (avoids CPU-GPU transfer)
+        load_device = 'cpu' if self.model_config.quantize else self.device_torch
+        chroma_state_dict = load_file(model_path, load_device)
         
         # determine number of double and single blocks
         double_blocks = 0

@@ -77,7 +77,8 @@ class BaseExtractProcess(BaseProcess):
 
         for key in list(state_dict.keys()):
             v = state_dict[key]
-            v = v.detach().clone().to("cpu").to(self.torch_dtype)
+            # Remove redundant .clone() before CPU transfer
+            v = v.detach().to("cpu").to(self.torch_dtype)
             state_dict[key] = v
 
         # having issues with meta
