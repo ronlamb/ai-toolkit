@@ -270,20 +270,21 @@ class ChromaModel(BaseModel):
         self.print_and_status_update("Model Loaded")
 
     def get_generation_pipeline(self):
-        scheduler = ChromaModel.get_train_scheduler()
-        pipeline = ChromaPipeline(
-            scheduler=scheduler,
-            text_encoder=unwrap_model(self.text_encoder[0]),
-            tokenizer=self.tokenizer[0],
-            text_encoder_2=unwrap_model(self.text_encoder[1]),
-            tokenizer_2=self.tokenizer[1],
-            vae=unwrap_model(self.vae),
-            transformer=unwrap_model(self.transformer)
-        )
-
-        # pipeline = pipeline.to(self.device_torch)
-
-        return pipeline
+        # Cache pipeline for reuse between calls (Change #4)
+        if not hasattr(self, '_cached_generation_pipeline') or self._cached_generation_pipeline is None:
+            scheduler = ChromaModel.get_train_scheduler()
+            pipeline = ChromaPipeline(
+                scheduler=scheduler,
+                text_encoder=unwrap_model(self.text_encoder[0]),
+                tokenizer=self.tokenizer[0],
+                text_encoder_2=unwrap_model(self.text_encoder[1]),
+                tokenizer_2=self.tokenizer[1],
+                vae=unwrap_model(self.vae),
+                transformer=unwrap_model(self.transformer)
+            )
+            # pipeline = pipeline.to(self.device_torch)
+            self._cached_generation_pipeline = pipeline
+        return self._cached_generation_pipeline
 
     def generate_single_image(
         self,

@@ -1137,8 +1137,9 @@ class StableDiffusion:
         flush()
         
         # Cache pipeline for reuse between generate_images() calls (Change #4)
-        if not hasattr(self, '_cached_pipeline') or self._cached_pipeline is None:
-            self._cached_pipeline = pipeline
+        # Reuse cached pipeline if available and no new pipeline is provided
+        if pipeline is None and hasattr(self, '_cached_pipeline') and self._cached_pipeline is not None:
+            pipeline = self._cached_pipeline
         # if using assistant, unfuse it
         if self.model_config.assistant_lora_path is not None:
             print_acc("Unloading assistant lora")
@@ -1735,8 +1736,11 @@ class StableDiffusion:
                 if self.adapter is not None and isinstance(self.adapter, ReferenceAdapter):
                     self.adapter.clear_memory()
 
-        # clear pipeline and cache to reduce vram usage
-        del pipeline
+        # Cache pipeline for reuse between generate_images() calls (Change #4)
+        # Only cache if we created the pipeline internally (not provided as parameter)
+        if pipeline is not None:
+            self._cached_pipeline = pipeline
+        # Clear refiner pipeline as it's not typically reused
         if refiner_pipeline is not None:
             del refiner_pipeline
         torch.cuda.empty_cache()
