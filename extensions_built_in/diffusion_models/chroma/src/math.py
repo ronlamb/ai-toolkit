@@ -33,7 +33,8 @@ def attention(q: Tensor, k: Tensor, v: Tensor, pe: Tensor, mask: Tensor) -> Tens
 
 def rope(pos: Tensor, dim: int, theta: int) -> Tensor:
     assert dim % 2 == 0
-    # Use float32 for MPS compatibility (MPS doesn't support float64)
+    # Use float32 for MPS compatibility (MPS doesn't support float64).
+    # CUDA and CPU will use float32 as well, and it is later converted to float32.
     scale = torch.arange(0, dim, 2, dtype=torch.float32, device=pos.device) / dim
     omega = 1.0 / (theta**scale)
     out = torch.einsum("...n,d->...nd", pos, omega)
