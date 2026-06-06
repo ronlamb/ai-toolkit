@@ -78,3 +78,21 @@ Each change requires:
 ## Notes
 - User tests manually after implementation
 - Check in and push to forked repo before next change
+
+## Platform-Specific Results
+
+### macOS (MPS)
+- When running on macOS with Apple Silicon (M-series), record test results in `docs/optimization/mac-results.md`
+- Use the same test protocol: 3 epochs × 30 steps, generate 2 images
+- Note any MPS-specific optimizations or compatibility fixes applied
+
+### Other Platforms (CUDA)
+- Record test results for CUDA/other platforms in `docs/optimization/results.md`
+- Include platform details (GPU model, CUDA version) when documenting results
+
+## MPS Compatibility (Apple Silicon)
+When making changes, ensure MPS compatibility:
+- Use `torch.float32` instead of `torch.float64` (MPS doesn't support float64)
+- 8-bit optimizers (bitsandbytes, Prodigy8bit) don't support MPS - use standard PyTorch optimizers instead
+- Add print statements for fallback logic (non-warning, just informational)
+- Don't add a print statement in the else part if no print existed before

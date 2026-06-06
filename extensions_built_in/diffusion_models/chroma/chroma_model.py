@@ -50,10 +50,11 @@ class FakeConfig:
         self.patch_size = 1
         
 class FakeCLIP(torch.nn.Module):
-    def __init__(self):
+    # for diffusers compatability
+    def __init__(self, device='cpu', dtype=torch.float32):
         super().__init__()
-        self.dtype = torch.bfloat16
-        self.device = 'cuda'
+        self.dtype = dtype
+        self.device = device
         self.text_model = None
         self.tokenizer = None
         self.model_max_length = 77
@@ -214,9 +215,8 @@ class ChromaModel(BaseModel):
             flush()
 
         # self.print_and_status_update("Loading CLIP")
-        text_encoder = FakeCLIP()
-        tokenizer = FakeCLIP()
-        text_encoder.to(self.device_torch, dtype=dtype)
+        text_encoder = FakeCLIP(device=self.device_torch, dtype=dtype)
+        tokenizer = FakeCLIP(device=self.device_torch, dtype=dtype)
 
         self.noise_scheduler = ChromaModel.get_train_scheduler()
         
@@ -282,7 +282,8 @@ class ChromaModel(BaseModel):
                 vae=unwrap_model(self.vae),
                 transformer=unwrap_model(self.transformer)
             )
-            # pipeline = pipeline.to(self.device_torch)
+            # Move pipeline to device for proper _execution_device inference
+            pipeline = pipeline.to(self.device_torch)
             self._cached_generation_pipeline = pipeline
         return self._cached_generation_pipeline
 
@@ -341,8 +342,14 @@ class ChromaModel(BaseModel):
             # img_ids = repeat(img_ids, "h w c -> b (h w) c",
             #                  b=bs).to(self.device_torch)
 
-            txt_ids = torch.zeros(
-                bs, text_embeddings.text_embeds.shape[1], 3).to(self.device_torch)
+            # Use float32 for MPS compatibility (bfloat16 not supported on Apple Silicon)
+            is_mps = self.device_torch.type == "mps"
+            txt_dtype = torch.float32 if is_mps else self.torch_dtype
+            # For MPS, create on CPU then move; for others, pass device directly
+            if is_mps:
+                txt_ids = torch.zeros(bs, text_embeddings.text_embeds.shape[1], 3, dtype=txt_dtype).to(self.device_torch)
+            else:
+                txt_ids = torch.zeros(bs, text_embeddings.text_embeds.shape[1], 3, device=self.device_torch, dtype=txt_dtype)
 
         guidance = torch.full([1], 0, device=self.device_torch, dtype=torch.float32)
         guidance = guidance.expand(latent_model_input_packed.shape[0])

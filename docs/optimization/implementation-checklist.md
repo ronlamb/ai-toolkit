@@ -34,8 +34,8 @@
 - [x] Pipeline caching implemented in `stable_diffusion_model.py`
 - [x] Pipeline caching implemented in `chroma_model.py`
 - [x] Changes checked in to git
-- [ ] User tested (results in `results.md`)
-- [ ] Changes pushed to forked repo
+- [x] User tested (results in `results.md`)
+- [x] Changes pushed to forked repo
 
 **Test Results**: 
 - Average sample time: ~57.88s/it (vs baseline 57.69s/it)

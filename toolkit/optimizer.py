@@ -10,6 +10,12 @@ def get_optimizer(
     if optimizer_params is None:
         optimizer_params = {}
     lower_type = optimizer_type.lower()
+    
+    # Detect MPS device and automatically disable 8-bit optimizers (bitsandbytes doesn't support MPS)
+    is_mps = torch.backends.mps.is_available()
+    if is_mps and lower_type.endswith("8bit"):
+        lower_type = lower_type.replace("8bit", "")
+        optimizer_type = optimizer_type[:-4]  # Remove '8bit' from original case
     if lower_type.startswith("dadaptation"):
         # dadaptation optimizer does not use standard learning rate. 1 is the default value
         import dadaptation
@@ -28,8 +34,12 @@ def get_optimizer(
             # warn user that dadaptation is deprecated
             print("WARNING: Dadaptation optimizer type has been changed to DadaptationAdam. Please update your config.")
     elif lower_type.startswith("prodigy8bit"):
-        from toolkit.optimizers.prodigy_8bit import Prodigy8bit
-        print("Using Prodigy optimizer")
+        if is_mps:
+            from prodigyopt import Prodigy
+            print("Using Prodigy optimizer (MPS fallback)")
+        else:
+            from toolkit.optimizers.prodigy_8bit import Prodigy8bit
+            print("Using Prodigy8bit optimizer")
         use_lr = learning_rate
         if use_lr < 0.1:
             # dadaptation uses different lr that is values of 0.1 to 1.0. default to 1.0
@@ -38,7 +48,10 @@ def get_optimizer(
         print(f"Using lr {use_lr}")
         # let net be the neural network you want to train
         # you can choose weight decay value based on your problem, 0 by default
-        optimizer = Prodigy8bit(params, lr=use_lr, eps=1e-6, **optimizer_params)
+        if is_mps:
+            optimizer = Prodigy(params, lr=use_lr, eps=1e-6, **optimizer_params)
+        else:
+            optimizer = Prodigy8bit(params, lr=use_lr, eps=1e-6, **optimizer_params)
     elif lower_type.startswith("prodigy"):
         from prodigyopt import Prodigy
 
@@ -54,12 +67,16 @@ def get_optimizer(
         optimizer = Prodigy(params, lr=use_lr, eps=1e-6, **optimizer_params)
     elif lower_type == "adam8":
         from toolkit.optimizers.adam8bit import Adam8bit
-
-        optimizer = Adam8bit(params, lr=learning_rate, eps=1e-6, **optimizer_params)
+        if is_mps:
+            optimizer = torch.optim.Adam(params, lr=float(learning_rate), eps=1e-6, **optimizer_params)
+        else:
+            optimizer = Adam8bit(params, lr=learning_rate, eps=1e-6, **optimizer_params)
     elif lower_type == "adamw8":
         from toolkit.optimizers.adam8bit import Adam8bit
-
-        optimizer = Adam8bit(params, lr=learning_rate, eps=1e-6, decouple=True, **optimizer_params)
+        if is_mps:
+            optimizer = torch.optim.AdamW(params, lr=float(learning_rate), eps=1e-6, **optimizer_params)
+        else:
+            optimizer = Adam8bit(params, lr=learning_rate, eps=1e-6, decouple=True, **optimizer_params)
     elif lower_type.endswith("8bit"):
         import bitsandbytes
 

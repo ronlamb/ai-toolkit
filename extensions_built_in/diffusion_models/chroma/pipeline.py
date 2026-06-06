@@ -120,7 +120,12 @@ class ChromaPipeline(FluxPipeline):
                 height, 
                 width, 
                 patch_size=2 if not self.is_radiance else 16
-            ).to(device=device, dtype=dtype)
+            )
+            # For MPS, move to device; for others, also set dtype
+            if device.type == "mps":
+                latent_image_ids = latent_image_ids.to(device)
+            else:
+                latent_image_ids = latent_image_ids.to(device=device, dtype=dtype)
             # latent_image_ids = self._prepare_latent_image_ids(batch_size, height // 2, width // 2, device, dtype)
             return latents.to(device=device, dtype=dtype), latent_image_ids
 
@@ -141,7 +146,12 @@ class ChromaPipeline(FluxPipeline):
             height, 
             width, 
             patch_size=2 if not self.is_radiance else 16
-        ).to(device=device, dtype=dtype)
+        )
+        # For MPS, move to device; for others, also set dtype
+        if device.type == "mps":
+            latent_image_ids = latent_image_ids.to(device)
+        else:
+            latent_image_ids = latent_image_ids.to(device=device, dtype=dtype)
 
         return latents, latent_image_ids
     
@@ -192,9 +202,20 @@ class ChromaPipeline(FluxPipeline):
         if isinstance(device, str):
             device = torch.device(device)
 
-        text_ids = torch.zeros(batch_size, prompt_embeds.shape[1], 3).to(device=device, dtype=torch.bfloat16)
-        if guidance_scale > 1.00001:
-            negative_text_ids = torch.zeros(batch_size, negative_prompt_embeds.shape[1], 3).to(device=device, dtype=torch.bfloat16)
+        # Use float32 for MPS compatibility (bfloat16 not supported on Apple Silicon)
+        is_mps = device.type == "mps"
+        text_dtype = torch.float32 if is_mps else torch.bfloat16
+        
+        # For MPS, create tensor on CPU then move to avoid CUDA init
+        # For other devices, pass device directly to torch.zeros
+        if is_mps:
+            text_ids = torch.zeros(batch_size, prompt_embeds.shape[1], 3, dtype=text_dtype).to(device)
+            if guidance_scale > 1.00001:
+                negative_text_ids = torch.zeros(batch_size, negative_prompt_embeds.shape[1], 3, dtype=text_dtype).to(device)
+        else:
+            text_ids = torch.zeros(batch_size, prompt_embeds.shape[1], 3, device=device, dtype=text_dtype)
+            if guidance_scale > 1.00001:
+                negative_text_ids = torch.zeros(batch_size, negative_prompt_embeds.shape[1], 3, device=device, dtype=text_dtype)
 
         # 4. Prepare latent variables
         num_channels_latents = 64 // 4

@@ -51,10 +51,11 @@ class FakeConfig:
         self.patch_size = 1
         
 class FakeCLIP(torch.nn.Module):
-    def __init__(self):
+    # for diffusers compatability
+    def __init__(self, device='cpu', dtype=torch.float32):
         super().__init__()
-        self.dtype = torch.bfloat16
-        self.device = 'cuda'
+        self.dtype = dtype
+        self.device = device
         self.text_model = None
         self.tokenizer = None
         self.model_max_length = 77
@@ -217,9 +218,8 @@ class ChromaRadianceModel(BaseModel):
             flush()
 
         # self.print_and_status_update("Loading CLIP")
-        text_encoder = FakeCLIP()
-        tokenizer = FakeCLIP()
-        text_encoder.to(self.device_torch, dtype=dtype)
+        text_encoder = FakeCLIP(device=self.device_torch, dtype=dtype)
+        tokenizer = FakeCLIP(device=self.device_torch, dtype=dtype)
 
         self.noise_scheduler = ChromaRadianceModel.get_train_scheduler()
 
