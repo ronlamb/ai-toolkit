@@ -99,6 +99,54 @@ When making changes for Apple Silicon (M-series), use the **[MPS Optimization Sk
 - [ ] Don't add `else` print statements if none existed before
 - [ ] Test on MPS device before committing
 
+## Results Format
+
+### Standardized Template for Change Documentation
+
+```markdown
+## Change #X: [Concise Title]
+
+**Status**: ✅ COMPLETED / ⚠️ REVERTED / ⚠️ INCONCLUSIVE
+
+**Issue**: Description of the bottleneck
+
+**Location**: File path, line numbers
+
+**Current Code**:
+```python
+[relevant snippet]
+```
+
+**Optimized Code**:
+```python
+[new optimized version, ≤20 lines]
+```
+
+**Test Results**:
+- Training: X.XXs/it → Y.YYs/it (Z% change)
+- Samples: A.AAs/it → B.BBs/it (C% change)
+
+**Analysis**: [detailed analysis of results, including why improvement was/wasn't achieved]
+
+**Verdict**: ✅ Keep / ⚠️ Revert / ⚠️ Monitor (with reasoning)
+```
+
+### Status Values
+
+| Status | Meaning |
+|--------|---------|
+| ✅ COMPLETED | Change implemented and validated, keep it |
+| ⚠️ REVERTED | Change tested but no improvement or issues found, revert needed |
+| ⚠️ INCONCLUSIVE | Results unclear, keep monitoring with more data |
+
+### Verdict Values
+
+| Verdict | Meaning |
+|---------|---------|
+| ✅ Keep | Change provides measurable improvement, commit it |
+| ⚠️ Revert | Change doesn't meet threshold or causes issues, revert with `git revert` |
+| ⚠️ Monitor | Safe change with no downside, keep an eye on future results |
+
 ## Decision Tree
 
 Use this when evaluating optimization candidates:
@@ -127,7 +175,7 @@ No API breaks? ─ No → Revert
 2. **Propose** top 5 changes with hypotheses and expected impact
 3. **Implement** one change at a time (≤20 lines per function)
 4. **Validate** with test protocol (3 epochs × 30 steps, 2 images)
-5. **Document** results in appropriate results file
+5. **Document** results using the [Results Format](#results-format)
 6. **Commit & push** to forked repo before next change
 
 ## Notes
@@ -139,3 +187,13 @@ No API breaks? ─ No → Revert
 
 ## See Also
 - **[Optimization Documentation Skill](../skills/optimization-documentation/SKILL.md)** - Generate standardized change templates, results tracking, and checklists
+- **[Results Format](../.github/optimization-workflow.md#results-format)** - Standardized markdown template for documenting changes
+- **[Optimization Validate Skill](../skills/optimization-validate/SKILL.md)** - Standardized validation protocol and test procedures
+
+## Notes
+
+- User tests manually after implementation
+- Keep changes surgical - no rewrites
+- If results are inconclusive, keep the change if it's safe (no downside)
+- Revert changes that don't meet the >2% improvement threshold
+- **[Results Format](../.github/optimization-workflow.md#results-format)** - Standardized markdown template for documenting changes

@@ -43,8 +43,10 @@ Each change requires:
 - Check in and push to forked repo before next change
 
 ## See Also
-- **[Optimization Workflow](./optimization-workflow.md)** - Detailed protocols, search targets, key patterns, test procedures
+- **[Optimization Workflow](./optimization-workflow.md)** - Detailed protocols, search targets, key patterns, test procedures, results format
 - **[Optimization Documentation Skill](./skills/optimization-documentation/SKILL.md)** - Generate standardized change templates, results tracking, and checklists
 - **[Optimization Skill](./skills/optimization/SKILL.md)** - Platform detection and routing to CUDA/MPS skills
 - **[CUDA Optimization Skill](./skills/cuda-optimization/SKILL.md)** - NVIDIA GPU-specific optimizations
 - **[MPS Optimization Skill](./skills/mps-optimization/SKILL.md)** - Apple Silicon-specific optimizations
+- **[Optimization Validate Skill](./skills/optimization-validate/SKILL.md)** - Standardized validation protocol and test procedures
+- **[Skills README](./skills/README.md)** - Overview of all optimization skills

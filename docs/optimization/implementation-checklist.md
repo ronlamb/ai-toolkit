@@ -1,5 +1,11 @@
 # Implementation Checklist
 
+## Notes
+
+- Use the **[Results Format](../.github/optimization-workflow.md#results-format)** for documenting detailed results
+- This checklist tracks high-level progress of each change
+- Reference `results.md` or `mac-results.md` for detailed metrics
+
 ## Change #1: Eliminate CPU-to-GPU Copy in State Dict Loading ✅ COMPLETED
 - [x] Code implemented in `chroma_model.py` line ~145
 - [x] User tested (results in `results.md`)

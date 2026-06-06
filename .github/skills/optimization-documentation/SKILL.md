@@ -40,6 +40,35 @@ Document test results for optimization changes.
 **Input**: Baseline metrics, change results, analysis
 **Output**: Formatted markdown for results.md or mac-results.md
 
+**Standardized Template**:
+```markdown
+## Change #X: [Concise Title]
+
+**Status**: ✅ COMPLETED / ⚠️ REVERTED / ⚠️ INCONCLUSIVE
+
+**Issue**: Description of the bottleneck
+
+**Location**: File path, line numbers
+
+**Current Code**:
+```python
+[relevant snippet]
+```
+
+**Optimized Code**:
+```python
+[new optimized version, ≤20 lines]
+```
+
+**Test Results**:
+- Training: X.XXs/it → Y.YYs/it (Z% change)
+- Samples: A.AAs/it → B.BBs/it (C% change)
+
+**Analysis**: [detailed analysis of results]
+
+**Verdict**: ✅ Keep / ⚠️ Revert / ⚠️ Monitor
+```
+
 ### 3. Implementation Checklist
 Generate checklist for tracking optimization progress.
 
