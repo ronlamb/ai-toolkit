@@ -1,4 +1,4 @@
-# Chroma Model Optimization Results for MPS - on M5 Max
+# Chroma Model Optimization Results for MPS - on M5 Max - 128GB memory
 
 Process is run for a step size of 30, for 3 epochs and generating images for 4 steps, due to slowness on macos.
 
