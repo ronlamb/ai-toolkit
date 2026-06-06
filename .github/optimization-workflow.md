@@ -78,9 +78,20 @@ Samples:    Generating Samples:   0%|          | 0/2 [00:00<?, ?it/s]
 - Include platform details: GPU model, CUDA version
 - Use same test protocol
 
+## Platform-Specific Skills
+
+For platform-specific optimizations, use the appropriate skill:
+
+| Platform | Skill | Purpose |
+|----------|-------|---------|
+| NVIDIA CUDA | `cuda-optimization` | AMP, torch.compile, CUDA graphs |
+| Apple Silicon MPS | `mps-optimization` | float32 constraints, no 8-bit optimizers |
+
+The **`optimization`** skill automatically detects the platform and routes to the appropriate skill.
+
 ## MPS Compatibility Checklist
 
-When making changes for Apple Silicon (M-series):
+When making changes for Apple Silicon (M-series), use the **[MPS Optimization Skill](../skills/mps-optimization/SKILL.md)** for guidance:
 
 - [ ] Use `torch.float32` instead of `torch.float64` (MPS doesn't support float64)
 - [ ] 8-bit optimizers (bitsandbytes, Prodigy8bit) don't support MPS - use standard PyTorch optimizers
@@ -97,7 +108,7 @@ Is it ≤20 lines? ─ No → Skip
      │
      Yes
      │
-Expected speedup >5%? ─ No → Skip
+Expected speedup >2%? ─ No → Skip
      │
      Yes
      │
@@ -124,7 +135,7 @@ No API breaks? ─ No → Revert
 - User tests manually after implementation
 - Keep changes surgical - no rewrites
 - If results are inconclusive, keep the change if it's safe (no downside)
-- Revert changes that don't meet the >5% improvement threshold
+- Revert changes that don't meet the >2% improvement threshold
 
 ## See Also
 - **[Optimization Documentation Skill](../skills/optimization-documentation/SKILL.md)** - Generate standardized change templates, results tracking, and checklists

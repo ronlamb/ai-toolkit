@@ -26,10 +26,10 @@ Each change requires:
 ## Decision Rules
 
 ### Proceed If:
-- ≤20 lines, >5% speedup, passes tests, no API breaks
+- ≤20 lines, >2% expected improvement (cumulative), passes tests, no API breaks
 
 ### Revert If:
-- No speedup, test failures, less maintainable, >20 lines
+- No measurable improvement, test failures, less maintainable, >20 lines
 
 ## Workflow
 1. Analyze codebase for bottlenecks
@@ -45,3 +45,6 @@ Each change requires:
 ## See Also
 - **[Optimization Workflow](./optimization-workflow.md)** - Detailed protocols, search targets, key patterns, test procedures
 - **[Optimization Documentation Skill](./skills/optimization-documentation/SKILL.md)** - Generate standardized change templates, results tracking, and checklists
+- **[Optimization Skill](./skills/optimization/SKILL.md)** - Platform detection and routing to CUDA/MPS skills
+- **[CUDA Optimization Skill](./skills/cuda-optimization/SKILL.md)** - NVIDIA GPU-specific optimizations
+- **[MPS Optimization Skill](./skills/mps-optimization/SKILL.md)** - Apple Silicon-specific optimizations
