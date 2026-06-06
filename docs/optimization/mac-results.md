@@ -10,4 +10,4 @@ Samples:    Generating Samples:   0%|          | 0/2 [00:00<?, ?it/s]
             Generating Samples: 100%|##########| 2/2 [01:59<00:00, 59.73s/it]
 ```
 
-**Note**: This is the initial baseline before any MPS compatibility fixes or optimizations were applied.
+**Note**: This is the initial baseline before any MPS compatibility fixes or optimizations were applied. All subsequent MPS-specific optimizations should be compared against this baseline.
