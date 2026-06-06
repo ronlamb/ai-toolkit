@@ -21,7 +21,7 @@ Samples:    Generating Samples:   0%|          | 0/2 [00:00<?, ?it/s]
 
 ---
 
-## Change #6: Cache Scheduler Weights on Device ✅ TODO
+## Change #1: Cache Scheduler Weights on Device ✅ TODO
 **Status**: ⏳ Planned
 
 **Issue**: In `get_weights_for_timesteps()`, weight tensors are moved to device **every call** via `.to(device=..., dtype=...)`. With 30+ inference steps, this creates 30+ redundant transfers.
@@ -47,7 +47,7 @@ weights = self.linear_timesteps_weights.to(
 
 ---
 
-## Change #7: Fix Text IDs CPU Allocation Overhead ✅ TODO
+## Change #2: Fix Text IDs CPU Allocation Overhead ✅ TODO
 **Status**: ⏳ Planned
 
 **Issue**: Text IDs created on CPU then moved to MPS:
@@ -72,7 +72,7 @@ else:
 
 ---
 
-## Change #8: Remove Duplicate Latent Image IDs Creation ✅ TODO
+## Change #3: Remove Duplicate Latent Image IDs Creation ✅ TODO
 **Status**: ⏳ Planned
 
 **Issue**: `prepare_latent_image_ids()` is called **twice identically** in `prepare_latents()`:
@@ -93,7 +93,7 @@ else:
 
 ---
 
-## Change #9: Remove Redundant Component Device Transfers ✅ TODO
+## Change #4: Remove Redundant Component Device Transfers ✅ TODO
 **Status**: ⏳ Planned
 
 **Issue**: After pipeline creation, components are moved to device multiple times:
@@ -114,7 +114,7 @@ else:
 
 ---
 
-## Change #10: Cache Scheduler Tensors with Device Awareness ✅ TODO
+## Change #5: Cache Scheduler Tensors with Device Awareness ✅ TODO
 **Status**: ⏳ Planned
 
 **Issue**: Scheduler tensors created on CPU with no device awareness:
@@ -141,11 +141,11 @@ self.linear_timesteps_weights = bsmntw_weighing  # Created on CPU
 
 | Change | Status | Location | Expected Impact | Type |
 |--------|--------|----------|-----------------|------|
-| #6 | ⏳ Planned | custom_flowmatch_sampler.py:77 | 5-10% | Scheduler caching |
-| #7 | ⏳ Planned | pipeline.py:209-215 | 1-2% | MPS-specific |
-| #8 | ⏳ Planned | pipeline.py:118-146 | 2-3% | General |
-| #9 | ⏳ Planned | chroma_model.py:251-261 | 3-5% | MPS-specific |
-| #10 | ⏳ Planned | custom_flowmatch_sampler.py:55-60 | 2-4% | MPS-specific |
+| #1 | ⏳ Planned | custom_flowmatch_sampler.py:77 | 5-10% | Scheduler caching |
+| #2 | ⏳ Planned | pipeline.py:209-215 | 1-2% | MPS-specific |
+| #3 | ⏳ Planned | pipeline.py:118-146 | 2-3% | General |
+| #4 | ⏳ Planned | chroma_model.py:251-261 | 3-5% | MPS-specific |
+| #5 | ⏳ Planned | custom_flowmatch_sampler.py:55-60 | 2-4% | MPS-specific |
 
 **Cumulative Expected Improvement**: 13-24%
 
