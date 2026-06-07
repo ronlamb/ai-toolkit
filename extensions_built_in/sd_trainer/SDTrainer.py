@@ -47,6 +47,29 @@ adapter_transforms = transforms.Compose([
 ])
 
 
+def to_device_if_needed(tensor: torch.Tensor, device: torch.device, dtype: torch.dtype = None) -> torch.Tensor:
+    """
+    Only transfer tensor to device if it's not already there, avoiding unnecessary copies.
+    This is critical for MPS memory fragmentation prevention.
+    
+    Args:
+        tensor: Input tensor
+        device: Target device
+        dtype: Optional target dtype (if None, keep current dtype)
+    
+    Returns:
+        Tensor on target device (may be same object if already correct)
+    """
+    if tensor.device != device:
+        if dtype is not None:
+            return tensor.to(device, dtype=dtype)
+        else:
+            return tensor.to(device)
+    elif dtype is not None and tensor.dtype != dtype:
+        return tensor.to(dtype=dtype)
+    return tensor
+
+
 class SDTrainer(BaseSDTrainProcess):
 
     def __init__(self, process_id: int, job, config: OrderedDict, **kwargs):
@@ -191,14 +214,14 @@ class SDTrainer(BaseSDTrainProcess):
                     positive = self.sd.encode_prompt(
                         gen_img_config.prompt,
                         control_images=ctrl_img
-                    ).to('cpu')
+                    ).to(self.device_torch, dtype=self.sd.torch_dtype)
                     negative = self.sd.encode_prompt(
                         gen_img_config.negative_prompt,
                         control_images=ctrl_img
-                    ).to('cpu')
+                    ).to(self.device_torch, dtype=self.sd.torch_dtype)
                 else:
-                    positive = self.sd.encode_prompt(gen_img_config.prompt).to('cpu')
-                    negative = self.sd.encode_prompt(gen_img_config.negative_prompt).to('cpu')
+                    positive = self.sd.encode_prompt(gen_img_config.prompt).to(self.device_torch, dtype=self.sd.torch_dtype)
+                    negative = self.sd.encode_prompt(gen_img_config.negative_prompt).to(self.device_torch, dtype=self.sd.torch_dtype)
                 
                 self.sd.sample_prompts_cache.append({
                     'conditional': positive,
@@ -816,11 +839,12 @@ class SDTrainer(BaseSDTrainProcess):
             # handle linear timesteps and only adjust the weight of the timesteps
             if do_weighted_timesteps:
                 # calculate the weights for the timesteps
+                # Note: cached weights are already on timesteps.device (same as loss.device)
                 timestep_weight = self.sd.noise_scheduler.get_weights_for_timesteps(
                     timesteps,
                     v2=self.train_config.linear_timesteps2,
                     timestep_type=self.train_config.timestep_type
-                ).to(loss.device, dtype=loss.dtype)
+                )
                 if len(loss.shape) == 4:
                     timestep_weight = timestep_weight.view(-1, 1, 1, 1).detach()
                 elif len(loss.shape) == 5:
@@ -1142,18 +1166,19 @@ class SDTrainer(BaseSDTrainProcess):
                     prompt_list[idx] = prompt
 
                 if batch.prompt_embeds is not None:
-                    embeds_to_use = batch.prompt_embeds.clone().to(self.device_torch, dtype=dtype)
+                    # Only transfer if needed to avoid MPS memory fragmentation
+                    embeds_to_use = to_device_if_needed(batch.prompt_embeds.clone(), self.device_torch, dtype=dtype)
                 else:
                     prompt_kwargs = {}
                     if self.sd.encode_control_in_text_embeddings and batch.control_tensor is not None:
-                        prompt_kwargs['control_images'] = batch.control_tensor.to(self.sd.device_torch, dtype=self.sd.torch_dtype)
+                        # Only transfer if needed to avoid MPS memory fragmentation
+                        prompt_kwargs['control_images'] = to_device_if_needed(batch.control_tensor, self.sd.device_torch, dtype=self.sd.torch_dtype)
                     embeds_to_use = self.sd.encode_prompt(
                         prompt_list,
-                        long_prompts=self.do_long_prompts).to(
-                        self.device_torch,
-                        dtype=dtype,
+                        long_prompts=self.do_long_prompts,
                         **prompt_kwargs
-                    ).detach()
+                    )
+                    embeds_to_use = to_device_if_needed(embeds_to_use, self.device_torch, dtype=dtype).detach()
 
             # dont use network on this
             # self.network.multiplier = 0.0
@@ -1169,15 +1194,17 @@ class SDTrainer(BaseSDTrainProcess):
                     unconditional_embeds.text_embeds = unconditional_embeds.text_embeds[:, :end_pos]
 
             if unconditional_embeds is not None:
-                unconditional_embeds = unconditional_embeds.to(self.device_torch, dtype=dtype).detach()
+                # Only transfer if needed to avoid MPS memory fragmentation
+                unconditional_embeds = to_device_if_needed(unconditional_embeds, self.device_torch, dtype=dtype).detach()
             
             guidance_embedding_scale = self.train_config.cfg_scale
             if self.train_config.do_guidance_loss:
                 guidance_embedding_scale = self._guidance_loss_target_batch
 
             prior_pred = self.sd.predict_noise(
-                latents=noisy_latents.to(self.device_torch, dtype=dtype).detach(),
-                conditional_embeddings=embeds_to_use.to(self.device_torch, dtype=dtype).detach(),
+                # Only transfer if needed to avoid MPS memory fragmentation
+                latents=to_device_if_needed(noisy_latents, self.device_torch, dtype=dtype).detach(),
+                conditional_embeddings=to_device_if_needed(embeds_to_use, self.device_torch, dtype=dtype).detach(),
                 unconditional_embeddings=unconditional_embeds,
                 timestep=timesteps,
                 guidance_scale=self.train_config.cfg_scale,
@@ -1331,7 +1358,8 @@ class SDTrainer(BaseSDTrainProcess):
                 with self.timer('get_adapter_images'):
                     # todo move this to data loader
                     if batch.control_tensor is not None:
-                        adapter_images = batch.control_tensor.to(self.device_torch, dtype=dtype).detach()
+                        # Only transfer if needed to avoid MPS memory fragmentation
+                        adapter_images = to_device_if_needed(batch.control_tensor, self.device_torch, dtype=dtype).detach()
                         # match in channels
                         if self.assistant_adapter is not None:
                             in_channels = self.assistant_adapter.config.in_channels
@@ -1346,13 +1374,14 @@ class SDTrainer(BaseSDTrainProcess):
                 with self.timer('get_clip_images'):
                     # todo move this to data loader
                     if batch.clip_image_tensor is not None:
-                        clip_images = batch.clip_image_tensor.to(self.device_torch, dtype=dtype).detach()
+                        # Only transfer if needed to avoid MPS memory fragmentation
+                        clip_images = to_device_if_needed(batch.clip_image_tensor, self.device_torch, dtype=dtype).detach()
 
             mask_multiplier = torch.ones((noisy_latents.shape[0], 1, 1, 1), device=self.device_torch, dtype=dtype)
             if batch.mask_tensor is not None:
                 with self.timer('get_mask_multiplier'):
                     # upsampling no supported for bfloat16
-                    mask_multiplier = batch.mask_tensor.to(self.device_torch, dtype=torch.float16).detach()
+                    mask_multiplier = to_device_if_needed(batch.mask_tensor, self.device_torch, dtype=torch.float16).detach()
                     # scale down to the size of the latents, mask multiplier shape(bs, 1, width, height), noisy_latents shape(bs, channels, width, height)
                     if len(noisy_latents.shape) == 5:
                         # video B,C,T,H,W
@@ -1366,7 +1395,7 @@ class SDTrainer(BaseSDTrainProcess):
                     )
                     # expand to match latents
                     mask_multiplier = mask_multiplier.expand(-1, noisy_latents.shape[1], -1, -1)
-                    mask_multiplier = mask_multiplier.to(self.device_torch, dtype=dtype).detach()
+                    mask_multiplier = to_device_if_needed(mask_multiplier, self.device_torch, dtype=dtype).detach()
                     # make avg 1.0
                     mask_multiplier = mask_multiplier / mask_multiplier.mean()
 
@@ -1498,8 +1527,9 @@ class SDTrainer(BaseSDTrainProcess):
                 if self.adapter and isinstance(self.adapter, ClipVisionAdapter):
                     with self.timer('encode_clip_vision_embeds'):
                         if has_clip_image:
+                            # Only transfer if needed to avoid MPS memory fragmentation
                             conditional_clip_embeds = self.adapter.get_clip_image_embeds_from_tensors(
-                                clip_images.detach().to(self.device_torch, dtype=dtype),
+                                to_device_if_needed(clip_images.detach(), self.device_torch, dtype=dtype),
                                 is_training=True,
                                 has_been_preprocessed=True
                             )
@@ -1534,29 +1564,22 @@ class SDTrainer(BaseSDTrainProcess):
                     unconditional_embeds = None
                     prompt_kwargs = {}
                     if self.sd.encode_control_in_text_embeddings and batch.control_tensor is not None:
-                        prompt_kwargs['control_images'] = batch.control_tensor.to(self.sd.device_torch, dtype=self.sd.torch_dtype)
+                        # Only transfer if needed to avoid MPS memory fragmentation
+                        prompt_kwargs['control_images'] = to_device_if_needed(batch.control_tensor, self.sd.device_torch, dtype=self.sd.torch_dtype)
                     if self.train_config.unload_text_encoder or self.is_caching_text_embeddings:
                         with torch.set_grad_enabled(False):
                             if batch.prompt_embeds is not None:
-                                # use the cached embeds
-                                conditional_embeds = batch.prompt_embeds.clone().detach().to(
-                                    self.device_torch, dtype=dtype
-                                )
+                                # use the cached embeds - only transfer if needed
+                                conditional_embeds = to_device_if_needed(batch.prompt_embeds.clone().detach(), self.device_torch, dtype=dtype)
                             else:
-                                embeds_to_use = self.cached_blank_embeds.clone().detach().to(
-                                    self.device_torch, dtype=dtype
-                                )
+                                embeds_to_use = to_device_if_needed(self.cached_blank_embeds.clone().detach(), self.device_torch, dtype=dtype)
                                 if self.cached_trigger_embeds is not None and not is_reg:
-                                    embeds_to_use = self.cached_trigger_embeds.clone().detach().to(
-                                        self.device_torch, dtype=dtype
-                                    )
+                                    embeds_to_use = to_device_if_needed(self.cached_trigger_embeds.clone().detach(), self.device_torch, dtype=dtype)
                                 conditional_embeds = concat_prompt_embeds(
                                     [embeds_to_use] * noisy_latents.shape[0]
                                 )
                             if self.train_config.do_cfg:
-                                unconditional_embeds = self.cached_blank_embeds.clone().detach().to(
-                                    self.device_torch, dtype=dtype
-                                )
+                                unconditional_embeds = to_device_if_needed(self.cached_blank_embeds.clone().detach(), self.device_torch, dtype=dtype)
                                 unconditional_embeds = concat_prompt_embeds(
                                     [unconditional_embeds] * noisy_latents.shape[0]
                                 )
@@ -1568,14 +1591,14 @@ class SDTrainer(BaseSDTrainProcess):
                         with torch.set_grad_enabled(True):
                             if isinstance(self.adapter, CustomAdapter):
                                 self.adapter.is_unconditional_run = False
+                            # Only transfer if needed to avoid MPS memory fragmentation
                             conditional_embeds = self.sd.encode_prompt(
                                 conditioned_prompts, prompt_2,
                                 dropout_prob=self.train_config.prompt_dropout_prob,
                                 long_prompts=self.do_long_prompts,
                                 **prompt_kwargs
-                            ).to(
-                                self.device_torch,
-                                dtype=dtype)
+                            )
+                            conditional_embeds = to_device_if_needed(conditional_embeds, self.device_torch, dtype=dtype)
 
                             if self.train_config.do_cfg:
                                 if isinstance(self.adapter, CustomAdapter):
@@ -1587,9 +1610,8 @@ class SDTrainer(BaseSDTrainProcess):
                                     dropout_prob=self.train_config.prompt_dropout_prob,
                                     long_prompts=self.do_long_prompts,
                                     **prompt_kwargs
-                                ).to(
-                                    self.device_torch,
-                                    dtype=dtype)
+                                )
+                                unconditional_embeds = to_device_if_needed(unconditional_embeds, self.device_torch, dtype=dtype)
                                 if isinstance(self.adapter, CustomAdapter):
                                     self.adapter.is_unconditional_run = False
                     else:
@@ -1604,14 +1626,14 @@ class SDTrainer(BaseSDTrainProcess):
                                 self.adapter.is_unconditional_run = False
                             if self.sd.encode_control_in_text_embeddings and batch.control_tensor_list is not None:
                                 prompt_kwargs['control_images'] = batch.control_tensor_list
+                            # Only transfer if needed to avoid MPS memory fragmentation
                             conditional_embeds = self.sd.encode_prompt(
                                 conditioned_prompts, prompt_2,
                                 dropout_prob=self.train_config.prompt_dropout_prob,
                                 long_prompts=self.do_long_prompts,
                                 **prompt_kwargs
-                            ).to(
-                                self.device_torch,
-                                dtype=dtype)
+                            )
+                            conditional_embeds = to_device_if_needed(conditional_embeds, self.device_torch, dtype=dtype)
                             if self.train_config.do_cfg:
                                 if isinstance(self.adapter, CustomAdapter):
                                     self.adapter.is_unconditional_run = True
@@ -1620,9 +1642,8 @@ class SDTrainer(BaseSDTrainProcess):
                                     dropout_prob=self.train_config.prompt_dropout_prob,
                                     long_prompts=self.do_long_prompts,
                                     **prompt_kwargs
-                                ).to(
-                                    self.device_torch,
-                                    dtype=dtype)
+                                )
+                                unconditional_embeds = to_device_if_needed(unconditional_embeds, self.device_torch, dtype=dtype)
                                 if isinstance(self.adapter, CustomAdapter):
                                     self.adapter.is_unconditional_run = False
                             
@@ -1631,14 +1652,15 @@ class SDTrainer(BaseSDTrainProcess):
                                 dop_prompts_2 = None
                                 if prompt_2 is not None:
                                     dop_prompts_2 = [p.replace(self.trigger_word, self.train_config.diff_output_preservation_class) for p in prompt_2]
+                                # Only transfer if needed to avoid MPS memory fragmentation
                                 self.diff_output_preservation_embeds = self.sd.encode_prompt(
                                     dop_prompts, dop_prompts_2,
                                     dropout_prob=self.train_config.prompt_dropout_prob,
                                     long_prompts=self.do_long_prompts,
                                     **prompt_kwargs
-                                ).to(
-                                    self.device_torch,
-                                    dtype=dtype)
+                                )
+                                self.diff_output_preservation_embeds = to_device_if_needed(
+                                    self.diff_output_preservation_embeds, self.device_torch, dtype=dtype)
                         # detach the embeddings
                         conditional_embeds = conditional_embeds.detach()
                         if self.train_config.do_cfg:
@@ -1668,12 +1690,12 @@ class SDTrainer(BaseSDTrainProcess):
                                 if self.assistant_adapter:
                                     # not training. detach
                                     down_block_additional_residuals = [
-                                        sample.to(dtype=dtype).detach() * adapter_multiplier for sample in
+                                        to_device_if_needed(sample, self.device_torch, dtype=dtype).detach() * adapter_multiplier for sample in
                                         down_block_additional_residuals
                                     ]
                                 else:
                                     down_block_additional_residuals = [
-                                        sample.to(dtype=dtype) * adapter_multiplier for sample in
+                                        to_device_if_needed(sample, self.device_torch, dtype=dtype) * adapter_multiplier for sample in
                                         down_block_additional_residuals
                                     ]
 
@@ -1743,8 +1765,9 @@ class SDTrainer(BaseSDTrainProcess):
                                     quad_count=quad_count
                                 )
                         elif has_clip_image:
+                            # Only transfer if needed to avoid MPS memory fragmentation
                             conditional_clip_embeds = self.adapter.get_clip_image_embeds_from_tensors(
-                                clip_images.detach().to(self.device_torch, dtype=dtype),
+                                to_device_if_needed(clip_images.detach(), self.device_torch, dtype=dtype),
                                 is_training=True,
                                 has_been_preprocessed=True,
                                 quad_count=quad_count,
@@ -1753,8 +1776,9 @@ class SDTrainer(BaseSDTrainProcess):
                                 # cfg_embed_strength=3.0 if not self.train_config.do_cfg else None
                             )
                             if self.train_config.do_cfg:
+                                # Only transfer if needed to avoid MPS memory fragmentation
                                 unconditional_clip_embeds = self.adapter.get_clip_image_embeds_from_tensors(
-                                    clip_images.detach().to(self.device_torch, dtype=dtype),
+                                    to_device_if_needed(clip_images.detach(), self.device_torch, dtype=dtype),
                                     is_training=True,
                                     drop=True,
                                     has_been_preprocessed=True,
@@ -1794,7 +1818,8 @@ class SDTrainer(BaseSDTrainProcess):
                     if has_clip_image or has_adapter_img:
                         img_to_use = clip_images if has_clip_image else adapter_images
                         # currently 0-1 needs to be -1 to 1
-                        reference_images = ((img_to_use - 0.5) * 2).detach().to(self.device_torch, dtype=dtype)
+                        # Only transfer if needed to avoid MPS memory fragmentation
+                        reference_images = to_device_if_needed(((img_to_use - 0.5) * 2).detach(), self.device_torch, dtype=dtype)
                         self.adapter.set_reference_images(reference_images)
                         self.adapter.noise_scheduler = self.sd.noise_scheduler
                     elif is_reg:
@@ -1917,7 +1942,8 @@ class SDTrainer(BaseSDTrainProcess):
                 self.before_unet_predict()
                 
                 if unconditional_embeds is not None:
-                    unconditional_embeds = unconditional_embeds.to(self.device_torch, dtype=dtype).detach()
+                    # Only transfer if needed to avoid MPS memory fragmentation
+                    unconditional_embeds = to_device_if_needed(unconditional_embeds, self.device_torch, dtype=dtype).detach()
                 with self.timer('condition_noisy_latents'):
                     # do it for the model
                     noisy_latents = self.sd.condition_noisy_latents(noisy_latents, batch)
@@ -1934,9 +1960,10 @@ class SDTrainer(BaseSDTrainProcess):
                             
                             # do a sample at the current timestep and step it, then determine new noise
                             next_sample_pred = self.predict_noise(
-                                noisy_latents=noisy_latents.to(self.device_torch, dtype=dtype),
+                                # Only transfer if needed to avoid MPS memory fragmentation
+                                noisy_latents=noisy_latents,
                                 timesteps=timesteps,
-                                conditional_embeds=conditional_embeds.to(self.device_torch, dtype=dtype),
+                                conditional_embeds=conditional_embeds,
                                 unconditional_embeds=unconditional_embeds,
                                 batch=batch,
                                 **pred_kwargs
@@ -1949,7 +1976,8 @@ class SDTrainer(BaseSDTrainProcess):
                             )
                             # stepped latents is our new noisy latents. Now we need to determine noise in the current sample
                             noisy_latents = stepped_latents
-                            original_samples = batch.latents.to(self.device_torch, dtype=dtype)
+                            # Only transfer if needed to avoid MPS memory fragmentation
+                            original_samples = to_device_if_needed(batch.latents, self.device_torch, dtype=dtype)
                             # todo calc next timestep, for now this may work as it
                             t_01 = (stepped_timesteps / 1000).to(original_samples.device)
                             if len(stepped_latents.shape) == 4:
@@ -1993,10 +2021,11 @@ class SDTrainer(BaseSDTrainProcess):
                     )
                 else:
                     with self.timer('predict_unet'):
+                        # Only transfer if needed to avoid MPS memory fragmentation
                         noise_pred = self.predict_noise(
-                            noisy_latents=noisy_latents.to(self.device_torch, dtype=dtype),
+                            noisy_latents=noisy_latents,
                             timesteps=timesteps,
-                            conditional_embeds=conditional_embeds.to(self.device_torch, dtype=dtype),
+                            conditional_embeds=conditional_embeds,
                             unconditional_embeds=unconditional_embeds,
                             batch=batch,
                             is_primary_pred=True,
@@ -2005,7 +2034,8 @@ class SDTrainer(BaseSDTrainProcess):
                     self.after_unet_predict()
 
                     with self.timer('calculate_loss'):
-                        noise = noise.to(self.device_torch, dtype=dtype).detach()
+                        # Only transfer noise if needed to avoid MPS memory fragmentation
+                        noise = to_device_if_needed(noise, self.device_torch, dtype=dtype).detach()
                         prior_to_calculate_loss = prior_pred
                         # if we are doing diff_output_preservation and not noing inverted masked prior
                         # then we need to send none here so it will not target the prior
@@ -2032,16 +2062,16 @@ class SDTrainer(BaseSDTrainProcess):
                             if self.train_config.diff_output_preservation:
                                 preservation_embeds = self.diff_output_preservation_embeds.expand_to_batch(noisy_latents.shape[0])
                             elif self.train_config.blank_prompt_preservation:
-                                blank_embeds = self.cached_blank_embeds.clone().detach().to(
-                                    self.device_torch, dtype=dtype
-                                )
+                                # Only transfer if needed to avoid MPS memory fragmentation
+                                blank_embeds = to_device_if_needed(self.cached_blank_embeds.clone().detach(), self.device_torch, dtype=dtype)
                                 preservation_embeds = concat_prompt_embeds(
                                     [blank_embeds] * noisy_latents.shape[0]
                                 )
                         preservation_pred = self.predict_noise(
-                            noisy_latents=noisy_latents.to(self.device_torch, dtype=dtype),
+                            # Only transfer if needed to avoid MPS memory fragmentation
+                            noisy_latents=noisy_latents,
                             timesteps=timesteps,
-                            conditional_embeds=preservation_embeds.to(self.device_torch, dtype=dtype),
+                            conditional_embeds=to_device_if_needed(preservation_embeds, self.device_torch, dtype=dtype),
                             unconditional_embeds=unconditional_embeds,
                             batch=batch,
                             **pred_kwargs
