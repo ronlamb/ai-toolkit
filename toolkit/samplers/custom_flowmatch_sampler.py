@@ -57,26 +57,37 @@ class CustomFlowMatchEulerDiscreteScheduler(FlowMatchEulerDiscreteScheduler):
             self.linear_timesteps = timesteps
             self.linear_timesteps_weights = bsmntw_weighing
             self.linear_timesteps_weights2 = hbsmntw_weighing
+            
+            # Cache for device-aware weight tensors to prevent repeated .to() calls
+            self._cached_device = None
+            self._cached_dtype = None
+            self._default_weighing_tensor_cached = None
+            self._linear_timesteps_weights_cached = None
+            self._linear_timesteps_weights2_cached = None
             pass
 
     def get_weights_for_timesteps(self, timesteps: torch.Tensor, v2=False, timestep_type="linear") -> torch.Tensor:
         # Get the indices of the timesteps
         step_indices = self._get_step_indices(timesteps.to(self.timesteps.device))
 
-        # Get the weights for the timesteps
+        # Invalidate cache if device or dtype changed
+        if self._cached_device != timesteps.device or self._cached_dtype != timesteps.dtype:
+            self._cached_device = timesteps.device
+            self._cached_dtype = timesteps.dtype
+            # Create cached copies on target device
+            self._default_weighing_tensor_cached = self.default_weighing_tensor.to(device=timesteps.device, dtype=timesteps.dtype)
+            self._linear_timesteps_weights_cached = self.linear_timesteps_weights.to(device=timesteps.device, dtype=timesteps.dtype)
+            self._linear_timesteps_weights2_cached = self.linear_timesteps_weights2.to(device=timesteps.device, dtype=timesteps.dtype)
+
+        # Get the weights for the timesteps (use cached tensors)
         if timestep_type == "weighted":
-            weights = self.default_weighing_tensor[step_indices].to(device=timesteps.device, dtype=timesteps.dtype)
-        
+            weights = self._default_weighing_tensor_cached[step_indices]
         elif v2:
             # weights = self.linear_timesteps_weights2[step_indices].flatten()
-            weights = self.linear_timesteps_weights2.to(
-                device=timesteps.device, dtype=timesteps.dtype
-            )[step_indices]
+            weights = self._linear_timesteps_weights2_cached[step_indices]
         else:
             # weights = self.linear_timesteps_weights[step_indices].flatten()
-            weights = self.linear_timesteps_weights.to(
-                device=timesteps.device, dtype=timesteps.dtype
-            )[step_indices]
+            weights = self._linear_timesteps_weights_cached[step_indices]
         return weights
 
     def get_sigmas(self, timesteps: torch.Tensor, n_dim, dtype, device) -> torch.Tensor:

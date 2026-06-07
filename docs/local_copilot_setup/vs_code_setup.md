@@ -44,8 +44,6 @@ Replace the base url with your appropriate url and the model.
 				"url": "http://127.0.0.1:1234",
 				"toolCalling": true,
 				"vision": true,
-				// "maxInputTokens": 128000,
-				// "maxOutputTokens": 16000
 				"maxInputTokens": 4096,
 				"maxOutputTokens": 1024
 			}
@@ -55,3 +53,16 @@ Replace the base url with your appropriate url and the model.
 ```
 
 Disable all Copilot moduls in Language Models screen.
+
+# Settings -> Chat
+
+Under Settings -> Chat set all the following to your Coding Model
+**Agent**:
+  - Plan Agent: **Default Model**
+**Inline Chat**:
+  - Defailt Model
+  
+# Cuurent utilization at time of this change
+
+Credits: 37% used: 73.9/200
+Inline Suggestions: 17% used: 356/200 as of 6/7 01:10

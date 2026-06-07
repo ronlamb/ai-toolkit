@@ -392,8 +392,6 @@ class ChromaModel(BaseModel):
             prompts = [prompt]
         else:
             prompts = prompt
-        if self.pipeline.text_encoder.device != self.device_torch:
-            self.pipeline.text_encoder.to(self.device_torch)
 
         max_length = 512
 
@@ -413,9 +411,6 @@ class ChromaModel(BaseModel):
         text_input_ids = text_inputs.input_ids
 
         prompt_embeds = self.text_encoder[1](text_input_ids.to(device), output_hidden_states=False)[0]
-
-        dtype = self.text_encoder[1].dtype
-        prompt_embeds = prompt_embeds.to(dtype=dtype, device=device)
 
         prompt_attention_mask = text_inputs["attention_mask"]
         

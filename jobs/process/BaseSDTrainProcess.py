@@ -93,6 +93,7 @@ class BaseSDTrainProcess(BaseTrainProcess):
         self.step_num = 0
         self.start_step = 0
         self.epoch_num = 0
+        self.prev_epoch_num = -1  # Track previous epoch for cleanup detection
         self.last_save_step = 0
         # start at 1 so we can do a sample at the start
         self.grad_accumulation_step = 1
@@ -485,7 +486,31 @@ class BaseSDTrainProcess(BaseTrainProcess):
         pass
     
     def end_step_hook(self):
-        pass
+        # Clear cached pipeline and adapter state between epochs to prevent slowdown
+        # This fixes the gradual performance degradation across epochs
+        if hasattr(self, 'prev_epoch_num') and self.prev_epoch_num != self.epoch_num:
+            # Epoch transition detected - clear cached resources
+            if hasattr(self.sd, '_cached_pipeline') and self.sd._cached_pipeline is not None:
+                # Delete cached pipeline to free accumulated state
+                del self.sd._cached_pipeline
+                self.sd._cached_pipeline = None
+            
+            # Clear adapter state if present
+            if self.adapter is not None and hasattr(self.adapter, 'clear_memory'):
+                self.adapter.clear_memory()
+            
+            # Clear sample prompts cache if it's accumulating
+            if hasattr(self.sd, 'sample_prompts_cache') and self.sd.sample_prompts_cache is not None:
+                # Clear the cache to prevent memory accumulation
+                self.sd.sample_prompts_cache = None
+            
+            # Clean up CUDA cache
+            import torch
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+        
+        # Track current epoch for next comparison
+        self.prev_epoch_num = self.epoch_num
 
     def save(self, step=None):
         if not self.accelerator.is_main_process:

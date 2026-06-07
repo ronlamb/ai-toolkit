@@ -47,19 +47,31 @@ adapter_transforms = transforms.Compose([
 ])
 
 
-def to_device_if_needed(tensor: torch.Tensor, device: torch.device, dtype: torch.dtype = None) -> torch.Tensor:
+def to_device_if_needed(tensor: Union[torch.Tensor, 'PromptEmbeds'], device: torch.device, dtype: torch.dtype = None) -> Union[torch.Tensor, 'PromptEmbeds']:
     """
     Only transfer tensor to device if it's not already there, avoiding unnecessary copies.
     This is critical for MPS memory fragmentation prevention.
     
     Args:
-        tensor: Input tensor
+        tensor: Input tensor or PromptEmbeds object
         device: Target device
         dtype: Optional target dtype (if None, keep current dtype)
     
     Returns:
-        Tensor on target device (may be same object if already correct)
+        Tensor or PromptEmbeds on target device (may be same object if already correct)
     """
+    # Handle PromptEmbeds objects
+    if hasattr(tensor, 'to') and not isinstance(tensor, torch.Tensor):
+        # Check if already on correct device
+        embed_device = tensor.text_embeds[0].device if isinstance(tensor.text_embeds, list) else tensor.text_embeds.device
+        if embed_device == device:
+            # Already on correct device, just return as-is (PromptEmbeds.to() returns self)
+            return tensor
+        else:
+            # Need to transfer to new device
+            return tensor.to(device, dtype=dtype) if dtype is not None else tensor.to(device)
+    
+    # Handle regular tensors
     if tensor.device != device:
         if dtype is not None:
             return tensor.to(device, dtype=dtype)
@@ -450,10 +462,10 @@ class SDTrainer(BaseSDTrainProcess):
                 timestep_idx = [(train_timesteps == t).nonzero().item() for t in timesteps_item][0]
                 single_step_timestep_schedule = [timesteps_item.squeeze().item()]
                 # extract the sigma idx for our midpoint timestep
-                sigmas = train_sigmas[timestep_idx:timestep_idx + 1].to(self.device_torch)
+                sigmas = to_device_if_needed(train_sigmas[timestep_idx:timestep_idx + 1], self.device_torch)
 
                 end_sigma_idx = random.randint(timestep_idx, len(train_sigmas) - 1)
-                end_sigma = train_sigmas[end_sigma_idx:end_sigma_idx + 1].to(self.device_torch)
+                end_sigma = to_device_if_needed(train_sigmas[end_sigma_idx:end_sigma_idx + 1], self.device_torch)
 
                 # add noise to our target
 
@@ -472,7 +484,7 @@ class SDTrainer(BaseSDTrainProcess):
                 pred_item, timesteps_item, noisy_latents_item.detach(), return_dict=False
             )[0]
 
-            residual_noise = (noise_item * end_sigma.flatten()).detach().to(self.device_torch, dtype=get_torch_dtype(
+            residual_noise = to_device_if_needed((noise_item * end_sigma.flatten()).detach(), self.device_torch, dtype=get_torch_dtype(
                 self.train_config.dtype))
             # remove the residual noise from the denoised latents. Output should be a clean prediction (theoretically)
             denoised_latent = denoised_latent - residual_noise
@@ -498,7 +510,7 @@ class SDTrainer(BaseSDTrainProcess):
         # you can do mse against the two here  or run the denoised through the vae for pixel space loss against the
         # input tensor images.
 
-        return output, batch.tensor.to(self.device_torch, dtype=get_torch_dtype(self.train_config.dtype))
+        return output, to_device_if_needed(batch.tensor, self.device_torch, dtype=get_torch_dtype(self.train_config.dtype))
 
     # you can expand these in a child class to make customization easier
     def calculate_loss(
@@ -523,7 +535,8 @@ class SDTrainer(BaseSDTrainProcess):
         has_mask = batch.mask_tensor is not None
 
         with torch.no_grad():
-            loss_multiplier = torch.tensor(batch.loss_multiplier_list).to(self.device_torch, dtype=torch.float32)
+            # Only transfer if needed to avoid MPS memory fragmentation
+            loss_multiplier = to_device_if_needed(torch.tensor(batch.loss_multiplier_list), self.device_torch, dtype=torch.float32)
 
         if self.train_config.match_noise_norm:
             # match the norm of the noise
@@ -567,7 +580,8 @@ class SDTrainer(BaseSDTrainProcess):
             if self.train_config.inverted_mask_prior and prior_pred is not None and has_mask:
                 assert not self.train_config.train_turbo
                 with torch.no_grad():
-                    prior_mask = batch.mask_tensor.to(self.device_torch, dtype=dtype)
+                    # Only transfer if needed to avoid MPS memory fragmentation
+                    prior_mask = to_device_if_needed(batch.mask_tensor, self.device_torch, dtype=dtype)
                     if len(noise_pred.shape) == 5:
                         # video B,C,T,H,W
                         lat_height = batch.latents.shape[3]
@@ -609,7 +623,9 @@ class SDTrainer(BaseSDTrainProcess):
             if not self.sd.is_flow_matching:
                 raise ValueError("Signal amplification is only supported for flow matching models")
             with torch.no_grad():
-                nas = 1.0 - (timesteps / 1000).to(noise.device, dtype=noise.dtype)
+                # Use to_device_if_needed to avoid MPS memory fragmentation
+                timesteps_norm = (timesteps / 1000.0)
+                nas = to_device_if_needed(timesteps_norm, noise.device, dtype=noise.dtype)
                 nas = nas * self.train_config.signal_amplification_strength
                 while len(nas.shape) < len(noise.shape):
                     nas = nas.unsqueeze(-1)
@@ -649,7 +665,7 @@ class SDTrainer(BaseSDTrainProcess):
                         timestep = timestep_chunks[idx]
                         self.sd.noise_scheduler._step_index = None
                         self.sd.noise_scheduler._init_step_index(timestep)
-                        sample = noisy_latent_chunks[idx].to(torch.float32)
+                        sample = to_device_if_needed(noisy_latent_chunks[idx], self.sd.vae.device, dtype=self.sd.vae.dtype)
                         
                         sigma = self.sd.noise_scheduler.sigmas[self.sd.noise_scheduler.step_index]
                         sigma_next = self.sd.noise_scheduler.sigmas[-1] # use last sigma for final step
@@ -658,7 +674,7 @@ class SDTrainer(BaseSDTrainProcess):
                     
                     stepped_latents = torch.cat(stepped_chunks, dim=0)
                     
-                stepped_latents = stepped_latents.to(self.sd.vae.device, dtype=self.sd.vae.dtype)
+                stepped_latents = to_device_if_needed(stepped_latents, self.sd.vae.device, dtype=self.sd.vae.dtype)
                 sl = stepped_latents
                 if len(sl.shape) == 5:
                     # video B,C,T,H,W
@@ -668,7 +684,8 @@ class SDTrainer(BaseSDTrainProcess):
                 pred_features = self.dfe(sl.float())
                 with torch.no_grad():
                     bl = batch.latents
-                    bl = bl.to(self.sd.vae.device)
+                    # Only transfer if needed to avoid MPS memory fragmentation
+                    bl = to_device_if_needed(bl, self.sd.vae.device)
                     if len(bl.shape) == 5:
                         # video B,C,T,H,W
                         bl = bl.permute(0, 2, 1, 3, 4)  # B,T,C,H,W
@@ -676,7 +693,8 @@ class SDTrainer(BaseSDTrainProcess):
                         bl = bl.reshape(b * t, c, h, w)
                     target_features = self.dfe(bl.float())
                     # scale dfe so it is weaker at higher noise levels
-                    dfe_scaler = 1 - (timesteps.float() / 1000.0).view(-1, 1, 1, 1).to(self.device_torch)
+                    # Only transfer if needed to avoid MPS memory fragmentation
+                    dfe_scaler = to_device_if_needed(1 - (timesteps.float() / 1000.0).view(-1, 1, 1, 1), self.device_torch)
                 
                 dfe_loss = torch.nn.functional.mse_loss(pred_features, target_features, reduction="none") * \
                     self.train_config.diffusion_feature_extractor_weight * dfe_scaler
@@ -745,7 +763,9 @@ class SDTrainer(BaseSDTrainProcess):
 
                 guidance_scale = self._guidance_loss_target_batch
                 if isinstance(guidance_scale, list):
-                    guidance_scale = torch.tensor(guidance_scale).to(target.device, dtype=target.dtype)
+                    # Use to_device_if_needed to avoid MPS memory fragmentation
+                    guidance_scale_tensor = torch.tensor(guidance_scale)
+                    guidance_scale = to_device_if_needed(guidance_scale_tensor, target.device, dtype=target.dtype)
                     guidance_scale = guidance_scale.view(-1, 1, 1, 1) if not is_video else guidance_scale.view(-1, 1, 1, 1, 1)
                 
                 unconditional_target = unconditional_target * alpha
@@ -782,7 +802,8 @@ class SDTrainer(BaseSDTrainProcess):
                 # we have to encode images into latents for now
                 # we also denoise as the unaugmented tensor is not a noisy diffirental
                 with torch.no_grad():
-                    unaugmented_latents = self.sd.encode_images(batch.unaugmented_tensor).to(self.device_torch, dtype=dtype)
+                    # Only transfer if needed to avoid MPS memory fragmentation
+                    unaugmented_latents = to_device_if_needed(self.sd.encode_images(batch.unaugmented_tensor), self.device_torch, dtype=dtype)
                     unaugmented_latents = unaugmented_latents * self.train_config.latent_multiplier
                     target = unaugmented_latents.detach()
 
@@ -802,7 +823,9 @@ class SDTrainer(BaseSDTrainProcess):
                 # do the loss on a stepped timestep 0 prediction
                 # doto handle doing priors, preservations, masking, etc
                 with torch.no_grad():
-                    tv = timesteps.to(noise_pred.device).to(noise_pred.dtype) / 1000.0
+                    # Use to_device_if_needed to avoid MPS memory fragmentation
+                    timesteps_norm = (timesteps / 1000.0)
+                    tv = to_device_if_needed(timesteps_norm, noise_pred.device, dtype=noise_pred.dtype)
                     # expand shape to match noise_pred
                     while len(tv.shape) < len(noise_pred.shape):
                         tv = tv.unsqueeze(-1)
@@ -1026,8 +1049,8 @@ class SDTrainer(BaseSDTrainProcess):
             t_frac = timesteps_t / total_steps  # [0,1]
             r_frac = timesteps_r / total_steps  # [0,1]
 
-            latents_clean = batch.latents.to(dtype)
-            noise_sample = noise.to(dtype)
+            latents_clean = to_device_if_needed(batch.latents, self.device_torch, dtype=dtype)
+            noise_sample = to_device_if_needed(noise, self.device_torch, dtype=dtype)
 
             lerp_vector = latents_clean * (1.0 - t_frac[:, None, None, None]) + noise_sample * t_frac[:, None, None, None]
 
@@ -1052,8 +1075,8 @@ class SDTrainer(BaseSDTrainProcess):
             timesteps_cat_perturbed = torch.cat([t_frac_plus_eps, r_frac], dim=0) * total_steps
 
             u_perturbed = self.predict_noise(
-                noisy_latents=lerp_perturbed.to(dtype),
-                timesteps=timesteps_cat_perturbed.to(dtype),
+                noisy_latents=to_device_if_needed(lerp_perturbed, self.device_torch, dtype=dtype),
+                timesteps=to_device_if_needed(timesteps_cat_perturbed, self.device_torch, dtype=dtype),
                 conditional_embeds=conditional_embeds,
                 unconditional_embeds=unconditional_embeds,
                 batch=batch,
@@ -1063,7 +1086,7 @@ class SDTrainer(BaseSDTrainProcess):
         # compute du/dt via finite difference (detached)
         du_dt = (u_perturbed - u_pred).detach() / eps
         # du_dt = (u_perturbed - u_pred).detach()
-        du_dt = du_dt.to(dtype)
+        du_dt = to_device_if_needed(du_dt, self.device_torch, dtype=dtype)
         
         
         time_gap = (t_frac - r_frac)[:, None, None, None].to(dtype)
@@ -1256,8 +1279,9 @@ class SDTrainer(BaseSDTrainProcess):
         if self.train_config.do_guidance_loss:
             guidance_embedding_scale = self._guidance_loss_target_batch
         return self.sd.predict_noise(
-            latents=noisy_latents.to(self.device_torch, dtype=dtype),
-            conditional_embeddings=conditional_embeds.to(self.device_torch, dtype=dtype),
+            # Only transfer if needed to avoid MPS memory fragmentation
+            latents=to_device_if_needed(noisy_latents, self.device_torch, dtype=dtype),
+            conditional_embeddings=to_device_if_needed(conditional_embeds, self.device_torch, dtype=dtype),
             unconditional_embeddings=unconditional_embeds,
             timestep=timesteps,
             guidance_scale=self.train_config.cfg_scale,
@@ -1852,9 +1876,7 @@ class SDTrainer(BaseSDTrainProcess):
                             prior_embeds_to_use = self.diff_output_preservation_embeds.expand_to_batch(noisy_latents.shape[0])
                         
                         if self.train_config.blank_prompt_preservation:
-                            blank_embeds = self.cached_blank_embeds.clone().detach().to(
-                                self.device_torch, dtype=dtype
-                            )
+                            blank_embeds = to_device_if_needed(self.cached_blank_embeds.clone().detach(), self.device_torch, dtype=dtype)
                             prior_embeds_to_use = concat_prompt_embeds(
                                 [blank_embeds] * noisy_latents.shape[0]
                             )
@@ -1979,7 +2001,9 @@ class SDTrainer(BaseSDTrainProcess):
                             # Only transfer if needed to avoid MPS memory fragmentation
                             original_samples = to_device_if_needed(batch.latents, self.device_torch, dtype=dtype)
                             # todo calc next timestep, for now this may work as it
-                            t_01 = (stepped_timesteps / 1000).to(original_samples.device)
+                            # Use to_device_if_needed to avoid MPS memory fragmentation
+                            timesteps_norm = (stepped_timesteps / 1000.0)
+                            t_01 = to_device_if_needed(timesteps_norm, original_samples.device, dtype=original_samples.dtype)
                             if len(stepped_latents.shape) == 4:
                                 t_01 = t_01.view(-1, 1, 1, 1)
                             elif len(stepped_latents.shape) == 5:

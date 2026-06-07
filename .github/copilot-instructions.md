@@ -40,7 +40,7 @@ Each change requires:
 
 ## Notes
 - User tests manually after implementation
-- Check in and push to forked repo before next change
+- **DO NOT commit or push to repo** - User handles version control
 
 ## See Also
 - **[Optimization Workflow](./optimization-workflow.md)** - Detailed protocols, search targets, key patterns, test procedures, results format
