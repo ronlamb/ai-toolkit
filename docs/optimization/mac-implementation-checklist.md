@@ -31,7 +31,7 @@ Samples:    Generating Samples:   0%|          | 0/2 [00:00<?, ?it/s]
 
 ---
 
-## Change #2: Fix Text IDs CPU Allocation Overhead ✅ TODO
+## Change #1: Epoch Cleanup (Cached Pipeline + Adapter State) ✅
 **Status**: ✅ Implemented and validated - Performance improved and stabilized across epochs
 
 **Issue**: Progressive slowdown across epochs due to accumulated cached pipeline state, adapter memory, and sample prompts cache
