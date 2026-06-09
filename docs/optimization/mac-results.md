@@ -138,4 +138,43 @@ Samples:    Generating Samples:   0%|          | 0/2 [00:00<?, ?it/s]
 
 ---
 
-**Note**: All subsequent MPS-specific optimizations should be compared against this updated baseline. The epoch cleanup fix has been validated for extended training runs with no performance degradation.
+## Change #6 Batch: MPS Correctness Fixes (Issues #3-#6, #9) ✅
+**Status**: ✅ Implemented and validated - Stability improved, neutral-to-slight performance gain
+
+**Issues Fixed**:
+- Issue #3: `train_tools.py` — `torch.cuda.manual_seed()` guarded with `torch.cuda.is_available()`
+- Issue #4: `stable_diffusion_model.py` — `torch.cuda.manual_seed()` guarded
+- Issue #5: `base_model.py` — `torch.cuda.manual_seed()` guarded
+- Issue #6: `stable_diffusion_model.py` — `torch.cuda.empty_cache()` → `flush()`
+- Issue #9: `BaseSDTrainProcess.py` — OOM exception handling catches MPS error patterns
+
+**Test Results**:
+```
+chroma_a1:  14%|#3        | 839/6000 [05:36<16:57:30, 11.60s/it, lr: 1.0e-04 loss: 2.962e-01]
+Generating Samples: 100%|##########| 2/2 [01:54<00:00, 57.09s/it]
+
+chroma_a1:  14%|#4        | 869/6000 [11:39<16:53:40, 11.85s/it, lr: 1.0e-04 loss: 3.266e-01]
+Generating Samples: 100%|##########| 2/2 [01:55<00:00, 57.97s/it]
+
+chroma_a1:  15%|#4        | 899/6000 [17:45<16:57:54, 11.97s/it, lr: 1.0e-04 loss: 3.300e-01]
+Generating Samples: 100%|##########| 2/2 [01:55<00:00, 57.93s/it]
+
+Extended: settled around 11.98-11.99s/it
+```
+
+**Performance Metrics**:
+- **Training**: 11.60s (epoch 1, clean start) → 11.98s (steady state, ~identical to Change #1 baseline of 11.93s)
+- **Sampling**: 57.09s → 57.97s (slight increase from 56.54s baseline, within noise)
+- **Stability**: Significantly improved — MPS OOM now caught, seed operations don't crash, cache actually clears
+
+**Analysis**:
+- Issues #3,#4,#5 (manual_seed guards): Correctness fixes, zero performance impact
+- Issue #6 (flush()): Faster start after validation sampling (11.60s vs 11.93s baseline) due to actual MPS cache clearing + GC. Steady state returns to baseline as memory fragments between flush calls.
+- Issue #9 (OOM handling): Stability fix, prevents crashes on MPS OOM
+- **Net result**: Stability win with neutral sustained performance. The `flush()` call provides cleaner starts but doesn't change steady-state speed.
+
+**Verdict**: ✅ Keep — Less crash-prone on MPS, far less performance hit than previous attempted changes (Issue #1 layers.py autocast attempt caused 10.5s → 12.93s regression). This batch is essentially free stability.
+
+---
+
+**Note**: All subsequent MPS-specific optimizations should be compared against this updated baseline. The epoch cleanup fix (Change #1) remains the largest performance gain. This batch provides stability improvements with neutral sustained performance.

@@ -1744,7 +1744,7 @@ class StableDiffusion:
         # Clear refiner pipeline as it's not typically reused
         if refiner_pipeline is not None:
             del refiner_pipeline
-        torch.cuda.empty_cache()
+        flush()
 
         # restore training state
         torch.set_rng_state(rng_state)

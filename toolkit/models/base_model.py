@@ -670,7 +670,7 @@ class BaseModel:
 
         # clear pipeline and cache to reduce vram usage
         del pipeline
-        torch.cuda.empty_cache()
+        flush()
 
         # restore training state
         torch.set_rng_state(rng_state)
