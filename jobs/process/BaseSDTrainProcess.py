@@ -2250,7 +2250,8 @@ class BaseSDTrainProcess(BaseTrainProcess):
             except torch.cuda.OutOfMemoryError:
                 did_oom = True
             except RuntimeError as e:
-                if "CUDA out of memory" in str(e):
+                error_str = str(e).lower()
+                if "cuda out of memory" in error_str or "mps out of memory" in error_str or "metal" in error_str or "allocatebuffer" in error_str:
                     did_oom = True
                 else:
                     raise  # not an OOM; surface real errors

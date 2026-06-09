@@ -8,7 +8,10 @@ This folder contains documentation for the Chroma model image generation speed o
 docs/
 └── optimization/
     ├── implementation-checklist.md  - Track progress of each optimization change
-    └── results.md                   - Detailed results from each optimization change
+    ├── results.md                   - Detailed results from each optimization change
+    ├── mac-instructions.md          - MPS-specific optimization guidelines
+    ├── mac-results.md               - MPS-specific test results
+    └── mac-change-6.md              - Missing MPS logic analysis (Change #6)
 ```
 
 ## Files

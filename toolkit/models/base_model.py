@@ -477,7 +477,8 @@ class BaseModel:
                     if network is not None:
                         network.multiplier = gen_config.network_multiplier
                     torch.manual_seed(gen_config.seed)
-                    torch.cuda.manual_seed(gen_config.seed)
+                    if torch.cuda.is_available():
+                        torch.cuda.manual_seed(gen_config.seed)
 
                     generator = torch.manual_seed(gen_config.seed)
 

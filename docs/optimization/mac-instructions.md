@@ -65,11 +65,10 @@ When working with MPS (Apple Silicon) performance in the AI Toolkit codebase, fo
 
 ## MPS Optimization Status
 
-See [MPS_OPTIMIZATIONS.md](../MPS_OPTIMIZATIONS.md) for the current status of all MPS optimizations, including:
-- Implementation progress
-- Test results for each change
-- Pending changes and their status
+See the following for the current status of all MPS optimizations:
+- [mac-results.md](./mac-results.md) - Detailed test results for each change
+- [mac-change-6.md](./mac-change-6.md) - Missing MPS logic analysis (Change #6)
 
 ---
 
-**Last Updated**: 2026-06-03
+**Last Updated**: 2026-06-08
