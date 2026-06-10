@@ -400,7 +400,7 @@ The following patterns are **already guarded** and work correctly on MPS:
 | 1 | #9 OOM Exception Handling | HIGH | Low |
 | 2 | #1 Chroma Layers Autocast | HIGH | Low |
 | 3 | #3 train_tools.py manual_seed | HIGH | Low |
-| 4 | #4 stable_diffusion_model.py manual_seed | HIGH | Low |
+| 4 | #4 stable_diffusion_model.py manual_seed | HIGH | Low | 
 | 5 | #5 base_model.py manual_seed | HIGH | Low |
 | 6 | #2 losses.py Autocast | MEDIUM | Low |
 | 7 | #10 ipc_collect/synchronize | MEDIUM | Low |
@@ -422,4 +422,21 @@ For each fix:
 
 ---
 
-**Last Updated**: 2026-06-08
+## Implementation Status
+
+| Issue | Description | Status | Notes |
+|-------|-------------|--------|-------|
+| #1 | Chroma Layers Autocast | ⏳ Not started | Hardcoded `"cuda"` in `torch.autocast()` in `layers.py` |
+| #2 | losses.py Autocast | ⏳ Not started | Hardcoded `device_type='cuda'` in `get_gradient_penalty()` |
+| #3 | train_tools.py manual_seed | ✅ Done | Guarded with `torch.cuda.is_available()` |
+| #4 | stable_diffusion_model.py manual_seed | ✅ Done | Guarded with `torch.cuda.is_available()` |
+| #5 | base_model.py manual_seed | ✅ Done | Guarded with `torch.cuda.is_available()` |
+| #6 | stable_diffusion_model.py empty_cache | ✅ Done | Replaced with `flush()` |
+| #7 | base_model.py empty_cache | ✅ Done | Replaced with `flush()` |
+| #8 | GenerateProcess.py empty_cache | ✅ Done | Replaced with `flush()` |
+| #9 | OOM Exception Handling | ✅ Done | Runtime error branch catches MPS patterns (`"mps out of memory"`, `"metal"`, `"allocatebuffer"`) |
+| #10 | ipc_collect/synchronize | ✅ Done | `ipc_collect()` guarded with `torch.cuda.is_available()`, `synchronize()` uses `torch.mps.synchronize()` on MPS |
+| #11 | LearnableSNRGamma device | ⏳ Not started | Default device hardcoded to `'cuda'` |
+| #12 | Device string parsing | ⏭️ Skip | Negligible impact, cosmetic only |
+
+**Last Updated**: 2026-06-09
