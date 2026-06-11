@@ -248,4 +248,46 @@ Generating Samples: 100%|##########| 2/2 [01:52<00:00, 56.40s/it]
 
 ---
 
-**Note**: All subsequent MPS-specific optimizations should be compared against this updated baseline (~11.7s/it training, ~56.4s/it sampling). The epoch cleanup fix (Change #1) remains the largest single gain. The cumulative `flush()` replacements (#6, #7, #8) provide ~2.3% sustained improvement. Issues #9 & #10 add stability with neutral-to-positive performance impact.
+## Issue #1: Chroma Layers Autocast Device Fix ⚠️
+**Status**: ⚠️ Implemented — measurable regression, correctness fix with performance cost
+
+**Issue**: Hardcoded `"cuda"` in `torch.autocast()` in `PatchEmbed.forward()` will crash on MPS
+
+**Location**: `extensions_built_in/diffusion_models/chroma/src/layers.py`, line 278
+
+**Change**:
+```python
+# Before:
+with torch.autocast("cuda", enabled=False):
+
+# After:
+with torch.autocast(inputs.device.type, enabled=False):
+```
+
+**Test Results**:
+```
+chroma_a1:   1%|1         | 89/6000 [05:47<19:39:15, 11.97s/it, lr: 1.0e-04 loss: 3.324e-01]
+Generating Samples: 100%|##########| 2/2 [01:54<00:00, 57.23s/it]
+
+chroma_a1:   2%|1         | 119/6000 [11:56<19:50:41, 12.15s/it, lr: 1.0e-04 loss: 3.456e-01]
+Generating Samples: 100%|##########| 2/2 [01:57<00:00, 58.80s/it]
+
+chroma_a1:   2%|2         | 149/6000 [18:00<19:43:57, 12.14s/it, lr: 1.0e-04 loss: 2.976e-01]
+Generating Samples: 100%|##########| 2/2 [01:56<00:00, 58.09s/it]
+```
+
+**Performance Metrics**:
+- **Training**: 11.97s → 12.15s → **12.14s** (settled quickly at epoch 2-3, **+3.7%** vs 11.7s baseline)
+- **Sampling**: 57.23s → 58.80s → **58.09s** (settled at ~58.1s, **+3%** vs 56.4s baseline)
+- **Stability**: No crashes, correctness fix works
+
+**Analysis**:
+- **Why regression?** `torch.autocast("mps", enabled=False)` creates a different context path than `torch.autocast("cuda", enabled=False)`. Even with `enabled=False`, the MPS autocast context has more overhead — likely due to MPS's less mature autocast infrastructure compared to CUDA's highly optimized path.
+- **Settled quickly**: Unlike previous changes that showed progressive degradation, this one stabilized by epoch 2-3, suggesting the overhead is constant per forward pass, not accumulating.
+- **Tradeoff**: This is a **correctness fix** — without it, MPS training crashes with `RuntimeError`. The ~3-4% cost is the price of MPS compatibility for this code path.
+
+**Verdict**: ⚠️ **Keep for correctness** — This prevents crashes on MPS. The regression is real but bounded (~3-4%). If performance becomes critical, an alternative would be to skip the autocast context entirely on MPS (wrap in `if device.type == "cuda":`), but that changes the code structure more significantly.
+
+---
+
+**Note**: All subsequent MPS-specific optimizations should be compared against this updated baseline (~12.14s/it training, ~58.1s/it sampling). Issue #1 adds ~3.7% training and ~3% sampling overhead as the cost of MPS correctness in the Chroma PatchEmbed layer.

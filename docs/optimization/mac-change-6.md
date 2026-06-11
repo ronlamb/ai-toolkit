@@ -426,7 +426,7 @@ For each fix:
 
 | Issue | Description | Status | Notes |
 |-------|-------------|--------|-------|
-| #1 | Chroma Layers Autocast | ⏳ Not started | Hardcoded `"cuda"` in `torch.autocast()` in `layers.py` |
+| #1 | Chroma Layers Autocast | ✅ Done | Replaced hardcoded `"cuda"` with `inputs.device.type` in `torch.autocast()` |
 | #2 | losses.py Autocast | ⏳ Not started | Hardcoded `device_type='cuda'` in `get_gradient_penalty()` |
 | #3 | train_tools.py manual_seed | ✅ Done | Guarded with `torch.cuda.is_available()` |
 | #4 | stable_diffusion_model.py manual_seed | ✅ Done | Guarded with `torch.cuda.is_available()` |
