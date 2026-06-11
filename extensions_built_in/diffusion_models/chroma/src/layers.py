@@ -1,3 +1,4 @@
+import contextlib
 import math
 from dataclasses import dataclass
 
@@ -275,7 +276,9 @@ class NerfEmbedder(nn.Module):
         # Store the original dtype to cast back to at the end.
         original_dtype = inputs.dtype
         # Force all operations within this module to run in fp32.
-        with torch.autocast("cuda", enabled=False):
+        # Only use autocast on CUDA; MPS autocast context adds overhead even with enabled=False
+        autocast_ctx = torch.autocast(device_type='cuda', enabled=False) if inputs.device.type == 'cuda' else contextlib.nullcontext()
+        with autocast_ctx:
             # Infer the patch side length from the number of pixels (P^2).
             patch_size = int(P2 ** 0.5)
 

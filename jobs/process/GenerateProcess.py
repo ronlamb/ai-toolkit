@@ -16,6 +16,7 @@ from toolkit.train_tools import get_torch_dtype
 import random
 
 from toolkit.util.get_model import get_model_class
+from toolkit.basic import flush
 
 
 class GenerateConfig:
@@ -170,4 +171,4 @@ class GenerateProcess(BaseProcess):
             # cleanup
             del self.sd
             gc.collect()
-            torch.cuda.empty_cache()
+            flush()

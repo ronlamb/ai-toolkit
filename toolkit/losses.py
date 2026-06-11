@@ -1,3 +1,4 @@
+import contextlib
 import torch
 from .llvae import LosslessLatentEncoder
 
@@ -42,7 +43,10 @@ class ComparativeTotalVariation(torch.nn.Module):
 
 # Gradient penalty
 def get_gradient_penalty(critic, real, fake, device):
-    with torch.autocast(device_type='cuda'):
+    device_type = device.type if hasattr(device, 'type') else str(device).split(':')[0]
+    # Only use autocast on CUDA; MPS autocast context adds overhead
+    autocast_ctx = torch.autocast(device_type='cuda') if device_type == 'cuda' else contextlib.nullcontext()
+    with autocast_ctx:
         real = real.float()
         fake = fake.float()
         alpha = torch.rand(real.size(0), 1, 1, 1).to(device).float()

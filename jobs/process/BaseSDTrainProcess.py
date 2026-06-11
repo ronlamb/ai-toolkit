@@ -2250,7 +2250,8 @@ class BaseSDTrainProcess(BaseTrainProcess):
             except torch.cuda.OutOfMemoryError:
                 did_oom = True
             except RuntimeError as e:
-                if "CUDA out of memory" in str(e):
+                error_str = str(e).lower()
+                if "cuda out of memory" in error_str or "mps out of memory" in error_str or "metal" in error_str or "allocatebuffer" in error_str:
                     did_oom = True
                 else:
                     raise  # not an OOM; surface real errors
@@ -2260,7 +2261,8 @@ class BaseSDTrainProcess(BaseTrainProcess):
                     raise RuntimeError("OOM during training step 3 times in a row, aborting training")
                 optimizer.zero_grad(set_to_none=True)
                 flush()
-                torch.cuda.ipc_collect()
+                if torch.cuda.is_available():
+                    torch.cuda.ipc_collect()
                 # skip this step and keep going
                 print_acc("")
                 print_acc("################################################")
@@ -2270,7 +2272,10 @@ class BaseSDTrainProcess(BaseTrainProcess):
             else:
                 self.num_consecutive_oom = 0
             if self.torch_profiler is not None:
-                torch.cuda.synchronize()  # Make sure all CUDA ops are done
+                if torch.cuda.is_available():
+                    torch.cuda.synchronize()
+                elif torch.backends.mps.is_available():
+                    torch.mps.synchronize()
                 self.torch_profiler.stop()
                 
                 print("\n==== Profile Results ====")

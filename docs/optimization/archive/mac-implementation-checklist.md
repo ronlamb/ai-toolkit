@@ -121,8 +121,8 @@ Samples:    Generating Samples:   0%|          | 0/2 [00:00<?, ?it/s]
 
 ---
 
-## Change #2: Fix Text IDs CPU Allocation Overhead ✅ TODO
-**Status**: ⏳ Planned
+## Change #2: Fix Text IDs CPU Allocation Overhead ❌ REVERTED
+**Status**: ❌ Reverted — caused regression
 
 **Issue**: Text IDs created on CPU then moved to MPS:
 ```python
@@ -132,59 +132,61 @@ else:
     text_ids = torch.zeros(bs, ..., device=device, dtype=txt_dtype)  # Direct to device
 ```
 
-**Location**: `extensions_built_in/diffusion_models/chroma/pipeline.py`, lines ~209-215
+**Attempted Fix**: Use direct device allocation for all devices (remove `.to(device)` call)
 
-**Proposed Fix**: Use direct device allocation for MPS (remove `.to(device)` call)
+**Result**: Regression on both metrics:
+- Training: 11.91s → 12.50s/it (+5.0% worse)
+- Sampling: 56.57s → 59.11s/it (+4.5% worse)
 
-**Expected Improvement**: 1-2% (LOW-MEDIUM)
+**Root Cause Analysis**: On MPS, the `.to(device)` pattern may trigger a more optimized memory path than direct allocation with `device='mps'`. The MPS backend may handle small tensor transfers more efficiently than in-place allocations.
 
 **Checklist**:
-- [ ] Code implemented
-- [ ] User tested (results in `mac-results.md`)
-- [ ] Code checked in to git
-- [ ] Changes pushed to forked repo
+- [x] Code attempted
+- [x] User tested (regression confirmed)
+- [x] Reverted to original
 
 ---
 
-## Change #3: Remove Duplicate Latent Image IDs Creation ✅ TODO
-**Status**: ⏳ Planned
+## Change #3: Remove Duplicate Latent Image IDs Creation ❌ REVERTED
+**Status**: ❌ Reverted — caused regression
 
-**Issue**: `prepare_latent_image_ids()` is called **twice identically** in `prepare_latents()`:
-- Lines ~118-120 (when latents provided)
-- Lines ~144-146 (when creating new latents)
+**Issue**: `prepare_latent_image_ids()` was called in both branches of `prepare_latents()`
 
-**Location**: `extensions_built_in/diffusion_models/chroma/pipeline.py`, lines ~118-146
+**Attempted Fix**: Consolidate to single call after if/else, remove early return
 
-**Proposed Fix**: Create latent_image_ids once and reuse
+**Result**: Clear regression on both metrics:
+- Training: 11.91s → 12.55s/it (+5.4% worse)
+- Sampling: 56.54s → 60.00s/it (+6.1% worse)
 
-**Expected Improvement**: 2-3% (MEDIUM-HIGH)
+**Root Cause Analysis**: Removing the early `return` in the `latents is not None` branch changed control flow in a way that hurt MPS performance. The early return was likely beneficial for the hot path despite the duplicated code.
 
 **Checklist**:
-- [ ] Code implemented
-- [ ] User tested (results in `mac-results.md`)
-- [ ] Code checked in to git
-- [ ] Changes pushed to forked repo
+- [x] Code attempted
+- [x] User tested (regression confirmed)
+- [x] Reverted to original
 
 ---
 
-## Change #4: Remove Redundant Component Device Transfers ✅ TODO
-**Status**: ⏳ Planned
+## Change #4: Remove Redundant Component Device Transfers ❌ REVERTED
+**Status**: ❌ Reverted — caused regression
 
-**Issue**: After pipeline creation, components are moved to device multiple times:
+**Issue**: After pipeline creation, components were moved to device multiple times:
 - Line ~251: `pipe.transformer.to(self.device_torch)`
-- Lines ~255, 258, 261: Additional `.to()` calls on same components
+- Lines ~255, 258: Text encoders `.to()` calls
+- Line ~261: `pipe.transformer.to(self.device_torch)` again
 
-**Location**: `extensions_built_in/diffusion_models/chroma/chroma_model.py`, lines ~251-261
+**Attempted Fix**: Remove first transformer `.to()` call and its `flush()`, keep only the second
 
-**Proposed Fix**: Remove duplicate `.to()` calls, keep only one per component
+**Result**: Regression on both metrics:
+- Training: 11.91s → 12.60s/it (+5.8% worse)
+- Sampling: 56.57s → 59.82s/it (+5.7% worse)
 
-**Expected Improvement**: 3-5% (MEDIUM)
+**Root Cause Analysis**: The first `flush()` between the two transformer transfers may be serving as a synchronization point that allows MPS to optimize memory layout. Removing it changed timing in a way that hurt subsequent operations.
 
 **Checklist**:
-- [ ] Code implemented
-- [ ] User tested (results in `mac-results.md`)
-- [ ] Code checked in to git
-- [ ] Changes pushed to forked repo
+- [x] Code attempted
+- [x] User tested (regression confirmed)
+- [x] Reverted to original
 
 ---
 
