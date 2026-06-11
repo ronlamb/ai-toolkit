@@ -426,8 +426,8 @@ For each fix:
 
 | Issue | Description | Status | Notes |
 |-------|-------------|--------|-------|
-| #1 | Chroma Layers Autocast | ✅ Done | Replaced hardcoded `"cuda"` with `inputs.device.type` in `torch.autocast()` |
-| #2 | losses.py Autocast | ⏳ Not started | Hardcoded `device_type='cuda'` in `get_gradient_penalty()` |
+| #1 | Chroma Layers Autocast | ✅ Done | Skip autocast on MPS via `contextlib.nullcontext()` — avoids ~3-4% regression from MPS autocast overhead |
+| #2 | losses.py Autocast | ✅ Done | Skip autocast on MPS via `contextlib.nullcontext()` in `get_gradient_penalty()` |
 | #3 | train_tools.py manual_seed | ✅ Done | Guarded with `torch.cuda.is_available()` |
 | #4 | stable_diffusion_model.py manual_seed | ✅ Done | Guarded with `torch.cuda.is_available()` |
 | #5 | base_model.py manual_seed | ✅ Done | Guarded with `torch.cuda.is_available()` |
@@ -436,7 +436,31 @@ For each fix:
 | #8 | GenerateProcess.py empty_cache | ✅ Done | Replaced with `flush()` |
 | #9 | OOM Exception Handling | ✅ Done | Runtime error branch catches MPS patterns (`"mps out of memory"`, `"metal"`, `"allocatebuffer"`) |
 | #10 | ipc_collect/synchronize | ✅ Done | `ipc_collect()` guarded with `torch.cuda.is_available()`, `synchronize()` uses `torch.mps.synchronize()` on MPS |
-| #11 | LearnableSNRGamma device | ⏳ Not started | Default device hardcoded to `'cuda'` |
+| #11 | LearnableSNRGamma device | ✅ Done | Auto-detect device (CUDA → MPS → CPU fallback) instead of hardcoded `'cuda'` |
 | #12 | Device string parsing | ⏭️ Skip | Negligible impact, cosmetic only |
 
-**Last Updated**: 2026-06-09
+**Last Updated**: 2026-06-10
+
+---
+
+## Final Results Summary
+
+**Baseline**: 11.7s/it training, ~56.6s/it sampling
+
+**Final (all 11 issues implemented)**:
+```
+chroma_a1:   5%|5         | 329/6000 [05:38<18:24:14, 11.68s/it]
+Generating Samples: 100%|##########| 2/2 [01:50<00:00, 55.21s/it]
+
+chroma_a1:   6%|5         | 359/6000 [11:27<18:15:18, 11.65s/it]
+Generating Samples: 100%|##########| 2/2 [01:52<00:00, 56.38s/it]
+
+chroma_a1:   6%|6         | 389/6000 [17:20<18:13:03, 11.69s/it]
+Generating Samples: 100%|##########| 2/2 [01:53<00:00, 56.63s/it]
+```
+
+**Training**: 11.65–11.69s/it (matches baseline 11.7s/it)
+**Sampling**: 55.2–56.6s/it (matches baseline ~56.6s/it)
+**Stability**: Excellent — no crashes, no progressive slowdown
+
+**Key Finding**: `torch.autocast("mps", ...)` adds measurable overhead even with `enabled=False`. Using `contextlib.nullcontext()` on MPS (while keeping autocast on CUDA) is the correct pattern for device-aware autocast contexts.
