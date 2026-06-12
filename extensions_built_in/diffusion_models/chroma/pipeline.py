@@ -203,19 +203,16 @@ class ChromaPipeline(FluxPipeline):
             device = torch.device(device)
 
         # Use float32 for MPS compatibility (bfloat16 not supported on Apple Silicon)
-        is_mps = device.type == "mps"
-        text_dtype = torch.float32 if is_mps else torch.bfloat16
-        
-        # For MPS, create tensor on CPU then move to avoid CUDA init
-        # For other devices, pass device directly to torch.zeros
-        if is_mps:
-            text_ids = torch.zeros(batch_size, prompt_embeds.shape[1], 3, dtype=text_dtype).to(device)
-            if guidance_scale > 1.00001:
-                negative_text_ids = torch.zeros(batch_size, negative_prompt_embeds.shape[1], 3, dtype=text_dtype).to(device)
-        else:
-            text_ids = torch.zeros(batch_size, prompt_embeds.shape[1], 3, device=device, dtype=text_dtype)
-            if guidance_scale > 1.00001:
-                negative_text_ids = torch.zeros(batch_size, negative_prompt_embeds.shape[1], 3, device=device, dtype=text_dtype)
+        text_dtype = torch.float32 if device.type == "mps" else torch.bfloat16
+
+        text_ids = torch.zeros(
+            batch_size, prompt_embeds.shape[1], 3, dtype=text_dtype
+        ).to(device)
+
+        if guidance_scale > 1.00001:
+            negative_text_ids = torch.zeros(
+                batch_size, negative_prompt_embeds.shape[1], 3,dtype=text_dtype
+            ).to(device)
 
         # 4. Prepare latent variables
         num_channels_latents = 64 // 4

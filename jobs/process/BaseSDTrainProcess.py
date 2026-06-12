@@ -504,10 +504,8 @@ class BaseSDTrainProcess(BaseTrainProcess):
                 # Clear the cache to prevent memory accumulation
                 self.sd.sample_prompts_cache = None
             
-            # Clean up CUDA cache
-            import torch
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
+            # Clean up cache
+            flush()
         
         # Track current epoch for next comparison
         self.prev_epoch_num = self.epoch_num
@@ -2251,7 +2249,7 @@ class BaseSDTrainProcess(BaseTrainProcess):
                 did_oom = True
             except RuntimeError as e:
                 error_str = str(e).lower()
-                if "cuda out of memory" in error_str or "mps out of memory" in error_str or "metal" in error_str or "allocatebuffer" in error_str:
+                if "out of memory" in error_str or "allocatebuffer" in error_str or "invalid buffer size" in error_str:
                     did_oom = True
                 else:
                     raise  # not an OOM; surface real errors
