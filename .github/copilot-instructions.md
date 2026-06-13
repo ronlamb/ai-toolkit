@@ -41,6 +41,7 @@ Each change requires:
 ## Notes
 - User tests manually after implementation
 - **DO NOT commit or push to repo** - User handles version control
+- **Use `.venv` for Python** — Run Python commands with `.venv/bin/python`, install packages with `.venv/bin/pip`. Do NOT use the system Python or `pip install` on the main environment.
 
 ## See Also
 - **[Optimization Workflow](./optimization-workflow.md)** - Detailed protocols, search targets, key patterns, test procedures, results format

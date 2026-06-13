@@ -1,0 +1,105 @@
+ob: extension
+config:
+  name: chroma_a1
+  process:
+  - type: diffusion_trainer
+    training_folder: ~/Documents/ai-toolkit/output
+    sqlite_db_path: ~/src/ai-toolkit/aitk_db.db
+    device: mps
+    trigger_word: null
+    performance_log_every: 10
+    network:
+      type: lora
+      linear: 32
+      linear_alpha: 32
+      conv: 16
+      conv_alpha: 16
+      lokr_full_rank: true
+      lokr_factor: -1
+      network_kwargs:
+        ignore_if_contains: []
+    save:
+      dtype: bf16
+      save_every: 30
+      max_step_saves_to_keep: 4
+      save_format: diffusers
+      push_to_hub: false
+    datasets:
+    - folder_path: ~/Documents/ai-toolkit/datasets/chroma_ut
+      mask_path: null
+      mask_min_value: 0.1
+      default_caption: ''
+      caption_ext: txt
+      caption_dropout_rate: 0.05
+      cache_latents_to_disk: false
+      is_reg: false
+      network_weight: 1
+      resolution:
+      - 768
+      controls: []
+      shrink_video_to_frames: true
+      num_frames: 1
+      flip_x: false
+      flip_y: false
+      num_repeats: 1
+    train:
+      batch_size: 1
+      bypass_guidance_embedding: false
+      steps: 6000
+      gradient_accumulation: 1
+      train_unet: true
+      train_text_encoder: false
+      gradient_checkpointing: true
+      noise_scheduler: flowmatch
+      optimizer: adamw8bit
+      timestep_type: sigmoid
+      content_or_style: balanced
+      optimizer_params:
+        weight_decay: 0.0001
+      unload_text_encoder: false
+      cache_text_embeddings: false
+      lr: 0.0001
+      ema_config:
+        use_ema: false
+        ema_decay: 0.99
+      skip_first_sample: true
+      force_first_sample: false
+      disable_sampling: false
+      dtype: bf16
+      diff_output_preservation: false
+      diff_output_preservation_multiplier: 1
+      diff_output_preservation_class: person
+      switch_boundary_every: 1
+      loss_type: mse
+    logging:
+      log_every: 1
+      use_ui_logger: true
+    model:
+      name_or_path: lodestones/Chroma1-HD
+      quantize: true
+      qtype: qfloat8
+      quantize_te: true
+      qtype_te: qfloat8
+      arch: chroma
+      low_vram: false
+      model_kwargs: {}
+    sample:
+      sampler: flowmatch
+      sample_every: 30
+      width: 832
+      height: 1216
+      samples:
+      - prompt: Photograph of a woman viewed from behind. She stands near a large oval      
+          window with greenery outside. She looks over her left shoulder lips slightly parted showing a slight smile. She is in a bright modern room with white walls and black furniture.
+      - prompt: A photo of The Hulk, Captain America and Iron Man standing in a desolate    
+          city with a gray sky.  In the background, there are destroyed buildings and debris, including cars, trucks and other vehicles.  A portal is visible in the sky with debris being sucked into it.  Doctor Strange is visible in the background behind the heroes, casting a spell trying to close the portal.
+      neg: ''
+      seed: 42
+      walk_seed: true
+      guidance_scale: 4
+      sample_steps: 4
+      num_frames: 1
+      fps: 1
+meta:
+  name: chroma_a1
+  version: '1.0'

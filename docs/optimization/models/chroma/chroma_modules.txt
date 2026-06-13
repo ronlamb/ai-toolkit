@@ -1,0 +1,42 @@
+# Chroma Model - Modules Called During Training and Sampling
+# Source: gpu_checks_all.txt, traced from run.py entry point
+
+## Chroma-Specific Modules
+./extensions_built_in/diffusion_models/chroma/chroma_model.py
+./extensions_built_in/diffusion_models/chroma/chroma_radiance_model.py
+./extensions_built_in/diffusion_models/chroma/pipeline.py
+./extensions_built_in/diffusion_models/chroma/src/layers.py
+./extensions_built_in/diffusion_models/chroma/src/model.py
+./extensions_built_in/diffusion_models/chroma/src/radiance.py
+
+## Shared Toolkit Modules (called by all models)
+./toolkit/config_modules.py
+./toolkit/control_generator.py
+./toolkit/dataloader_mixins.py
+./toolkit/dequantize.py
+./toolkit/embedding.py
+./toolkit/image_utils.py
+./toolkit/ip_adapter.py
+./toolkit/kohya_lora.py
+./toolkit/kohya_model_util.py
+./toolkit/layers.py
+./toolkit/llvae.py
+./toolkit/lorm.py
+./toolkit/losses.py
+./toolkit/lycoris_utils.py
+./toolkit/memory_management/manager.py
+./toolkit/memory_management/manager_modules.py
+./toolkit/models/FakeVAE.py
+./toolkit/models/base_model.py
+./toolkit/models/diffusion_feature_extraction.py
+./toolkit/network_mixins.py
+./toolkit/optimizers/optimizer_utils.py
+
+## Shared Jobs/Process Modules (called during training)
+./jobs/ExtensionJob.py
+./jobs/TrainJob.py
+./jobs/process/BaseSDTrainProcess.py
+./jobs/process/TrainSDRescaleProcess.py
+
+## Shared UI Entry Point
+./flux_train_ui.py

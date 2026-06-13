@@ -1,0 +1,79 @@
+# GPU Check Files NOT Called by Any of the 5 Target Models
+# Target models: chroma, flux2, ernie_image, hidream, z_image
+# These files are in gpu_checks_all.txt but are not in the call chain for these models
+
+## Audio Models (not in target set)
+./extensions_built_in/audio_models/ace_step/ace_step_15_model.py
+./extensions_built_in/audio_models/ace_step/src/model.py
+./extensions_built_in/audio_models/base_audio_model.py
+./extensions_built_in/captioner/AceStepCaptioner.py
+
+## Other Diffusion Models (not in target set)
+./extensions_built_in/diffusion_models/ltx2/ltx2.py
+./extensions_built_in/diffusion_models/nucleus_image/nucleus_image_model.py
+./extensions_built_in/diffusion_models/omnigen2/__init__.py
+./extensions_built_in/diffusion_models/omnigen2/src/models/transformers/repo.py
+./extensions_built_in/diffusion_models/omnigen2/src/ops/triton/layer_norm.py
+./extensions_built_in/diffusion_models/omnigen2/src/schedulers/scheduling_dpmsolver_multistep.py
+./extensions_built_in/diffusion_models/qwen_image/qwen_image.py
+./extensions_built_in/diffusion_models/wan22/wan22_14b_model.py
+./extensions_built_in/diffusion_models/wan22/wan22_pipeline.py
+./extensions_built_in/diffusion_models/zeta_chroma/zeta_chroma_model.py
+./extensions_built_in/diffusion_models/zeta_chroma/zeta_chroma_pipeline.py
+./extensions_built_in/diffusion_models/zeta_chroma/zeta_chroma_transformer.py
+./toolkit/models/wan21/wan21.py
+./toolkit/models/wan21/wan21_i2v.py
+
+## Non-Training/Non-Sampling Jobs
+./jobs/ExtractJob.py
+./jobs/GenerateJob.py
+./jobs/MergeJob.py
+./jobs/ModJob.py
+./jobs/process/BaseExtractProcess.py
+./jobs/process/BaseMergeProcess.py
+./jobs/process/ModRescaleLoraProcess.py
+./jobs/process/TrainESRGANProcess.py
+./jobs/process/TrainSliderProcess.py
+./jobs/process/TrainSliderProcessOld.py
+./jobs/process/TrainVAEProcess.py
+./jobs/process/models/critic.py
+./jobs/process/models/vgg19_critic.py
+
+## Extensions Not Used by Target Models
+./extensions/example/ExampleMergeModels.py
+./extensions_built_in/advanced_generator/Img2ImgGenerator.py
+./extensions_built_in/advanced_generator/PureLoraGenerator.py
+./extensions_built_in/advanced_generator/ReferenceGenerator.py
+./extensions_built_in/captioner/BaseCaptioner.py
+./extensions_built_in/captioner/Qwen3VLCaptioner.py
+./extensions_built_in/concept_slider/ConceptSliderTrainer.py
+./extensions_built_in/dataset_tools/SuperTagger.py
+./extensions_built_in/dataset_tools/tools/fuyu_utils.py
+./extensions_built_in/dataset_tools/tools/llava_utils.py
+./extensions_built_in/sd_trainer/SDTrainer.py
+./extensions_built_in/ultimate_slider_trainer/UltimateSliderTrainerProcess.py
+
+## Scripts (not called during training/sampling)
+./scripts/calculate_timestep_weighing_flex.py
+./scripts/caption_audio_dataset.py
+./scripts/convert_cog.py
+./scripts/convert_diffusers_to_comfy.py
+./scripts/convert_diffusers_to_comfy_transformer_only.py
+./scripts/extract_lora_from_flex.py
+./scripts/make_diffusers_model.py
+./scripts/make_lcm_sdxl_model.py
+
+## Testing Files
+./testing/compare_keys.py
+./testing/generate_lora_mapping.py
+./testing/generate_weight_mappings.py
+./testing/merge_in_text_encoder_adapter.py
+./testing/shrink_pixart_sm.py
+./testing/shrink_pixart_sm2.py
+./testing/shrink_pixart_sm3.py
+./testing/test_model_load_save.py
+./testing/test_vae.py
+./testing/test_vae_cycle.py
+
+## UI Entry (not in call chain for training/sampling)
+./flux_train_ui.py
