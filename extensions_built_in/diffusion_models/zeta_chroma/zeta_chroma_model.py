@@ -94,6 +94,12 @@ class ZetaChromaModel(BaseModel):
 
         transformer_state_dict = load_file(transformer_path, device="cpu")
 
+        # Remove non-parameter metadata keys from checkpoint
+        transformer_state_dict = {
+            k: v for k, v in transformer_state_dict.items()
+            if k not in ("__sequential__",)
+        }
+
         # cast to dtype
         for key in transformer_state_dict:
             transformer_state_dict[key] = transformer_state_dict[key].to(dtype)
