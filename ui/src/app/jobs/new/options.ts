@@ -31,7 +31,8 @@ type AdditionalSections =
   | 'model.layer_offloading'
   | 'model.low_vram'
   | 'model.qie.match_target_res'
-  | 'model.assistant_lora_path';
+  | 'model.assistant_lora_path'
+  | 'ideogram_4_prompt';
 
 type ModelGroup = 'image' | 'instruction' | 'video' | 'experimental' | 'audio';
 
@@ -999,8 +1000,30 @@ export const modelArchs: ModelArch[] = [
     additionalSections: [
       'model.low_vram',
       'model.layer_offloading',
+      'ideogram_4_prompt',
     ],
     hasMultiLinePrompts: true,
+  },
+  {
+    name: 'prx_pixel',
+    label: 'PRXPixel (pixel space)',
+    group: 'image',
+    defaults: {
+      'config.process[0].model.name_or_path': ['Photoroom/prxpixel-t2i', defaultNameOrPath],
+      'config.process[0].model.quantize': [true, false],
+      'config.process[0].model.quantize_te': [true, false],
+      'config.process[0].train.timestep_type': ['linear', 'sigmoid'],
+      'config.process[0].network.conv': [undefined, 16],
+      'config.process[0].network.conv_alpha': [undefined, 16],
+      'config.process[0].model.low_vram': [true, false],
+    },
+    disableSections: [
+      'network.conv',
+    ],
+    additionalSections: [
+      'model.low_vram',
+      'model.layer_offloading',
+    ],
   },
 ].sort((a, b) => {
   // Sort by label, case-insensitive

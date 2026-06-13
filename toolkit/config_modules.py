@@ -706,10 +706,17 @@ class ModelConfig:
 
         # compile the model with torch compile
         self.compile = kwargs.get("compile", False)
-        
+
         if self.compile and self.quantize:
-            print("Warning: You cannot compile a quantized model. Disabling compile.")
-            self.compile = False
+            print("Quantized model detected - allowing torch.compile (experimental)")
+            # make it torchao instead of quantio for compatibility with torch compile
+            if self.qtype == "qfloat8":
+                self.qtype = "float8"
+        self.block_compile = kwargs.get("block_compile", False)
+        self.compile_mode = kwargs.get("compile_mode", "default")
+        self.compile_fullgraph = kwargs.get("compile_fullgraph", False)
+        self.compile_dynamic = kwargs.get("compile_dynamic", True)
+        self.cache_size_limit = kwargs.get("cache_size_limit", 8)
         
         # kwargs to pass to the model
         self.model_kwargs = kwargs.get("model_kwargs", {})
@@ -944,8 +951,9 @@ class DatasetConfig:
                                                   None)  # path where matching unconditional images are located
         self.invert_mask: bool = kwargs.get('invert_mask', False)  # invert mask
         self.mask_min_value: float = kwargs.get('mask_min_value', 0.0)  # min value for . 0 - 1
-        self.poi: Union[str, None] = kwargs.get('poi',
-                                                None)  # if one is set and in json data, will be used as auto crop scale point of interes
+        self.poi: Union[str, None] = kwargs.get('poi', None)
+        if self.poi is not None:
+            raise ValueError("poi is deprecated and is no longer supported")
         self.use_short_captions: bool = kwargs.get('use_short_captions', False)  # if true, will use 'caption_short' from json
         self.num_repeats: int = kwargs.get('num_repeats', 1)  # number of times to repeat dataset
         # cache latents will store them in memory
