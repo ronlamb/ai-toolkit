@@ -1,0 +1,401 @@
+commit 891adf955b68441afaf1c1d490dec921273785dd
+Merge: c9c3878 a86238d
+Author: Ron Lamb <ron.lamb@gmail.com>
+Date:   Sat Jun 13 18:30:58 2026 -0400
+
+    Merge branch 'mac_gpu_improvements' into mac_gpu_util
+
+commit a589aea744ef3b6b207f5b7bdac6280d53d822ad
+Merge: 3f6e76b 0a302f3
+Author: ronlamb <ron.lamb@gmail.com>
+Date:   Sat Jun 13 16:20:59 2026 -0400
+
+    updates
+
+commit 0a302f3fe843555862df1fbe538801c03d38841f
+Merge: 90a2084 6c3b826
+Author: ronlamb <30437503+ronlamb@users.noreply.github.com>
+Date:   Sat Jun 13 13:46:28 2026 -0400
+
+    Merge pull request #2 from ostris/main
+    
+    Merge in
+
+commit fb9c3c51f3e263e567eb4267f03db6ed075d7d69
+Merge: ff246fc 03b954e
+Author: ronlamb <30437503+ronlamb@users.noreply.github.com>
+Date:   Wed Jun 10 22:20:42 2026 -0400
+
+    Merge pull request #1 from ronlamb/mac_mps_improvements
+    
+    Mac mps improvements
+
+commit 67048df9f90eb61e0ddb1ccad18410ebd85ff1ef
+Merge: be54094 a513a15
+Author: Jaret Burkett <jaretburkett@gmail.com>
+Date:   Fri Apr 17 06:05:40 2026 -0600
+
+    Merge branch 'main' of github.com:ostris/ai-toolkit
+
+commit 401f7df42541c7e80682fda6d9cd47b27f75907a
+Merge: 4df3b04 489b194
+Author: Jaret Burkett <jaretburkett@gmail.com>
+Date:   Thu Mar 26 09:11:50 2026 -0600
+
+    Merge branch 'main' of github.com:ostris/ai-toolkit
+
+commit 21bb8a2bf4e3ac08fe89d628e9cc7b3fcf759a65
+Merge: 50e5d99 01cf480
+Author: Jaret Burkett <jaretburkett@gmail.com>
+Date:   Tue Nov 25 07:53:36 2025 -0800
+
+    Merge pull request #525 from ostris/flux2
+    
+    Add support for FLUX.2
+
+commit 0b5f3475e2b921fb7262188e71e1477d1bd1fefe
+Merge: af8e9ea 50e5d99
+Author: Jaret Burkett <jaretburkett@gmail.com>
+Date:   Sun Nov 23 08:18:35 2025 -0700
+
+    Merge branch 'main' into flux2
+
+commit 0eaa3d289327a20cd0e984cae01b33e1b97a2964
+Merge: f744751 1069dee
+Author: Jaret Burkett <jaretburkett@gmail.com>
+Date:   Thu Sep 25 11:33:18 2025 -0600
+
+    Merge pull request #434 from ostris/qwen_image_edit_plus
+    
+    Add full support for Qwen-Image-Edit-2509
+
+commit 3cdf50cbfc7407ff31b3023fdc6628fab1fddf07
+Merge: 2120dc5 e27e229
+Author: Jaret Burkett <jaretburkett@gmail.com>
+Date:   Thu Sep 18 03:03:18 2025 -0600
+
+    Merge pull request #426 from squewel/prior_reg
+    
+    Dataset-level prior regularization
+
+commit b6f43fb7c27402ae9ee2c050ed650729fc69eaf0
+Merge: 38d3814 59ff4ef
+Author: Jaret Burkett <jaretburkett@gmail.com>
+Date:   Fri Aug 22 10:29:25 2025 -0600
+
+    Merge pull request #383 from ostris/qwen_image_edit
+    
+    Add support for Qwen-Image-Edit
+
+commit 280aca685faff6269a17ae7709e55d387fa602a8
+Merge: be71cc7 1029fa8
+Author: Jaret Burkett <jaretburkett@gmail.com>
+Date:   Sat Aug 16 14:25:23 2025 -0600
+
+    Merge pull request #377 from ostris/wan22_14b
+    
+    Wan2.2 14B T2I support
+
+commit 6bb3aed9a24b6479a31259cb33e04f60e01238fa
+Merge: 9dfb614 74b4d2d
+Author: Jaret Burkett <jaretburkett@gmail.com>
+Date:   Mon Aug 4 15:51:01 2025 -0600
+
+    Merge pull request #359 from ostris/qwen_image
+    
+    Add support for Qwen Image
+
+commit b1bff66d52a53b0649ddd85108409c088bdc642b
+Merge: 8610c6e a77ba5a
+Author: Jaret Burkett <jaretburkett@gmail.com>
+Date:   Sun Jul 20 12:00:55 2025 -0600
+
+    Merge pull request #343 from davertor/fix_kontext_bs
+    
+    fix: Guidance incorrect shape
+
+commit 84c6edca7e2b3d923bc671a5bfed3fc4a7eceb82
+Merge: 18513ec 24cd949
+Author: Jaret Burkett <jaretburkett@gmail.com>
+Date:   Wed Jun 25 14:10:25 2025 -0600
+
+    Merge branch 'main' into dev
+
+commit 18513ec866660b6f25a82a01c87f9381cf34a82b
+Merge: cbf04b8 5e73376
+Author: Jaret Burkett <jaretburkett@gmail.com>
+Date:   Tue Jun 24 10:56:54 2025 -0600
+
+    Merged in from main
+
+commit 0946a665762ce4857e7f4b1c090906ec6c8ee969
+Merge: ba5196d 3f0ae99
+Author: Jaret Burkett <jaretburkett@gmail.com>
+Date:   Thu Jun 12 08:11:19 2025 -0600
+
+    Merge branch 'main' into dev
+
+commit cf11f128b90fba20b96faeaea7d8fba9e0879ff9
+Merge: ffb5fe0 5e86139
+Author: Jaret Burkett <jaretburkett@gmail.com>
+Date:   Thu Jun 12 07:44:12 2025 -0600
+
+    Merge pull request #304 from hameerabbasi/fix-caption-loads
+    
+    Fix caption loading
+
+commit ba5196dd4aa762f587f5f42e5784d245a87779fc
+Merge: 82b90b9 ffb5fe0
+Author: Jaret Burkett <jaretburkett@gmail.com>
+Date:   Tue Jun 10 10:26:11 2025 -0600
+
+    Merge branch 'main' into dev
+
+commit 7d76165dcfc15e8082c84faad0378b1b327ba91b
+Merge: 6413018 b6d25fc
+Author: Jaret Burkett <jaretburkett@gmail.com>
+Date:   Sun Jun 1 13:33:40 2025 -0600
+
+    Merge branch 'main' into dev
+
+commit fca7fd6c3827c0af44ef9920ed70682e32d35508
+Merge: e5181d2 4f896c0
+Author: Jaret Burkett <jaretburkett@gmail.com>
+Date:   Wed May 21 02:20:06 2025 -0600
+
+    Merge branch 'main' of github.com:ostris/ai-toolkit
+
+commit fd6026ab734831ca2789f2701ca3f0352714bcb4
+Merge: c12036d 79c8770
+Author: Jaret Burkett <jaretburkett@gmail.com>
+Date:   Wed Apr 16 13:48:27 2025 -0600
+
+    Merge pull request #278 from ostris/hidream
+    
+    Add Hidream support
+
+commit 89c0f688dbf88410920ce50a3fff6d585ec3b456
+Merge: 3a5ea2c 1e0bff6
+Author: Jaret Burkett <jaretburkett@gmail.com>
+Date:   Sun Apr 13 21:16:07 2025 -0600
+
+    Merge branch 'main' into hidream
+
+commit e9e30104d30870fb6ad6dbf13927ab047edd0403
+Merge: c101f07 ce4c529
+Author: Jaret Burkett <jaretburkett@gmail.com>
+Date:   Wed Mar 26 19:12:09 2025 -0600
+
+    Merge pull request #271 from ostris/wavelet_loss
+    
+    Added experimental wavelet loss
+
+commit 4e3bda7c706ebb4236938ae9ea931ae1275c9e99
+Merge: c5e0c2b 763128e
+Author: Jaret Burkett <jaretburkett@gmail.com>
+Date:   Wed Mar 5 14:52:06 2025 -0700
+
+    Merge pull request #264 from ostris/cogview4
+    
+    Added basics for CogView4. Broken as hell though. Dont use.
+
+commit 8bb47d1bfe5c1e386af8ace3a70b4233b405747b
+Merge: e7dbb20 c5e0c2b
+Author: Jaret Burkett <jaretburkett@gmail.com>
+Date:   Tue Mar 4 00:31:57 2025 -0700
+
+    Merge branch 'main' into wan21
+
+commit f0fbd8bb534d238a607a3020b7a824d8ad114fd7
+Merge: ab641e0 0a981be
+Author: Jaret Burkett <jaretburkett@gmail.com>
+Date:   Sun Feb 23 16:10:49 2025 -0700
+
+    Merge pull request #256 from ostris/ui
+    
+    Added AI-Toolkit UI
+
+commit 0b8a32def7c483aac22e97056eddb61a88fe55a4
+Merge: 787bb37 ed1deb7
+Author: Jaret Burkett <jaretburkett@gmail.com>
+Date:   Wed Feb 12 09:33:03 2025 -0700
+
+    merged in lumina2 branch
+
+commit af5e760be183292585be5371a8a84c7d98697ef1
+Merge: e5355bf ff3d54b
+Author: Jaret Burkett <jaretburkett@gmail.com>
+Date:   Sat Feb 8 07:11:10 2025 -0700
+
+    Merge pull request #249 from ostris/accelerate-multi-gpu
+    
+    Multi gpu support. Other goodies
+
+commit 2141c6e06c858c939958b34d722913ef5bb60c35
+Merge: 5e66374 1188cf1
+Author: Jaret Burkett <jaretburkett@gmail.com>
+Date:   Sun Jan 26 11:19:34 2025 -0700
+
+    Merge remote-tracking branch 'origin/main' into accelerate-multi-gpu
+
+commit dd931757cdbcee8017ba94ff0c5d05673df66eb1
+Merge: 0640cdf 0b048d0
+Author: Jaret Burkett <jaretburkett@gmail.com>
+Date:   Sun Oct 20 07:04:29 2024 -0600
+
+    Merge branch 'main' of github.com:ostris/ai-toolkit
+
+commit 6a754b27102001d8502642d8efffd4cf3ebe2614
+Merge: a939cf3 169dbd2
+Author: Jaret Burkett <jaretburkett@gmail.com>
+Date:   Thu Aug 22 04:36:50 2024 -0600
+
+    Merge branch 'main' of github.com:ostris/ai-toolkit
+
+commit e07bf11727a48830c5f3479e8381529f8cae2c9e
+Merge: 00bd3d5 c728cc9
+Author: Jaret Burkett <jaretburkett@gmail.com>
+Date:   Wed Aug 14 08:01:51 2024 -0600
+
+    Merge pull request #61 from fofr/patch-1
+    
+    Fix image name in captions section of README
+
+commit 7f0ecdb37783232f3c31c167b31fe8271f5d901b
+Merge: fbed856 6d31c6d
+Author: Jaret Burkett <jaretburkett@gmail.com>
+Date:   Sun Aug 11 11:10:45 2024 -0600
+
+    Merge branch 'main' of github.com:ostris/ai-toolkit
+
+commit 93e5df1d599244ecf1d22d59212d37e454e7e71f
+Merge: 045e4a6 76f225a
+Author: Jaret Burkett <jaretburkett@gmail.com>
+Date:   Sun Jul 7 07:56:56 2024 -0600
+
+    Merge branch 'main' of github.com:ostris/ai-toolkit
+
+commit bb57623a352abd1e414498f6af642dd995cd5961
+Merge: 3072d20 f6b21f4
+Author: Jaret Burkett <jaretburkett@gmail.com>
+Date:   Sat Jun 29 15:53:40 2024 -0600
+
+    Merge branch 'main' of github.com:ostris/ai-toolkit
+
+commit 8407c4deea6bb40ed299fa3a9af677a13dded8fd
+Merge: 64f2b08 7165f2d
+Author: Jaret Burkett <jaretburkett@gmail.com>
+Date:   Sun Jun 23 14:47:43 2024 -0600
+
+    Merge branch 'main' of github.com:ostris/ai-toolkit
+
+commit f415bac7b5425f197748c4b3941b84082394d4f9
+Merge: f1cb87f 8f9cd82
+Author: Jaret Burkett <jaretburkett@gmail.com>
+Date:   Wed Mar 6 09:32:38 2024 -0700
+
+    Merge branch 'main' of github.com:ostris/ai-toolkit
+
+commit 537af79b0d5b2d4eb1553d337090f16a2e63d894
+Merge: 7624241 0d5943a
+Author: Jaret Burkett <jaretburkett@gmail.com>
+Date:   Wed Nov 29 10:13:55 2023 -0700
+
+    Merge branch 'main' of github.com:ostris/ai-toolkit
+
+commit bef10a639c6837982e52168661c2eb971bef6149
+Merge: 3eb3535 c2a4b8e
+Author: Jaret Burkett <jaretburkett@gmail.com>
+Date:   Tue Nov 28 10:40:05 2023 -0700
+
+    Merge remote-tracking branch 'origin/development'
+    
+    # Conflicts:
+    #       toolkit/stable_diffusion_model.py
+
+commit 3eb3535683db3a5b56d977b1fdb23e42399fbbaa
+Merge: bee0b6a 3d38710
+Author: Jaret Burkett <jaretburkett@gmail.com>
+Date:   Thu Sep 14 15:31:09 2023 -0600
+
+    Merge pull request #12 from bendeguzvaradi/main
+    
+    Bug/Safety checker to None
+
+commit b79ced3e10a65e477e4c52c14ad0390726e48803
+Merge: 2ecb5cf bee0b6a
+Author: Jaret Burkett <jaretburkett@gmail.com>
+Date:   Mon Aug 28 16:21:51 2023 -0600
+
+    Merge branch 'main' into development
+
+commit 2ecb5cf024aae6507f6e46c754fee498fdb02d1f
+Merge: e866c75 fab7c2b
+Author: Jaret Burkett <jaretburkett@gmail.com>
+Date:   Mon Aug 28 14:01:44 2023 -0600
+
+    Merge branch 'main' into development
+
+commit 2cb27c3f577c4c5ff1b5299be5bb896b5d439115
+Merge: 3367ab6 24f46ea
+Author: Jaret Burkett <jaretburkett@gmail.com>
+Date:   Sat Aug 26 08:55:09 2023 -0600
+
+    Merge branch 'main' of github.com:ostris/ai-toolkit
+
+commit 24f46ea7d60f80388279d065a26d02197142f775
+Merge: aeaca13 5bef298
+Author: Jaret Burkett <jaretburkett@gmail.com>
+Date:   Fri Aug 25 20:05:51 2023 -0600
+
+    Merge pull request #9 from FoundSol/patch-1
+    
+    Update README.md
+
+commit 7b770bc305babb3f522965062c2482cf8c2b05e2
+Merge: 36ba08d f200cf3
+Author: Jaret Burkett <jaretburkett@gmail.com>
+Date:   Wed Aug 23 13:31:37 2023 -0600
+
+    Merge pull request #7 from ostris/textual_inversion
+    
+    Textual inversion training
+
+commit 80e2f4a2a4425020e4e046c9f14aff114334f148
+Merge: d51c4ca c7ec132
+Author: Jaret Burkett <jaretburkett@gmail.com>
+Date:   Fri Aug 18 11:45:00 2023 -0600
+
+    Merge branch 'main' of github.com:ostris/ai-toolkit
+
+commit fd95e7b60c79a4f064ffd596ae0bc82b1e057362
+Merge: 379992d c7054d7
+Author: Jaret Burkett <jaretburkett@gmail.com>
+Date:   Sat Aug 12 05:59:58 2023 -0600
+
+    Merge branch 'main' of github.com:ostris/ai-toolkit
+
+commit ff2c9f3d04efbb4d03d354b0290260c17d071410
+Merge: 8bd536d 64fbd4c
+Author: Jaret Burkett <jaretburkett@gmail.com>
+Date:   Mon Aug 7 18:05:03 2023 -0600
+
+    Merge branch 'main' of github.com:ostris/ai-toolkit
+
+commit 63cacf43620519d989bb6a77615d1ec49d5d44e2
+Merge: c01673f c1b1e80
+Author: Jaret Burkett <jaretburkett@gmail.com>
+Date:   Mon Jul 31 15:14:28 2023 -0600
+
+    Merge remote-tracking branch 'origin/main' into WIP
+
+commit 8ba1b11557863c1ac0004c73e38c5b298ddec55b
+Merge: 1e50b39 9cdf2dd
+Author: Jaret Burkett <jaretburkett@gmail.com>
+Date:   Sat Jul 29 14:29:18 2023 -0600
+
+    Merge branch 'sdxl' into WIP
+    
+    # Conflicts:
+    #       jobs/process/BaseSDTrainProcess.py
+    #       jobs/process/TrainSliderProcess.py

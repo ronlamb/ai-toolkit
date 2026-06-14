@@ -6,6 +6,7 @@ Created for Change #7: MPS Optimization - Device Check Consolidation.
 """
 
 import contextlib
+import gc
 import torch
 
 
@@ -107,7 +108,6 @@ def flush_cuda_ipc() -> None:
 
 def flush_cache(garbage_collect: bool = True) -> None:
     """Flush CUDA and MPS caches, optionally run garbage collector."""
-    import gc
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
     if torch.backends.mps.is_available():
