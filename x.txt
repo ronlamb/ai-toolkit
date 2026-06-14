@@ -1,3 +1,17 @@
+commit 9ea67341eed6a1521acf8ae93cd6351f2f22bdff
+Merge: fe3b8c2 232426f
+Author: Ron Lamb <ron.lamb@gmail.com>
+Date:   Sun Jun 14 15:54:45 2026 -0400
+
+    Merge branch 'mac_mps_improvements' into mac_gpu_util
+
+commit 232426fde20645d059ef35d2a26766ee950f88e7
+Merge: 98ab293 0a302f3
+Author: Ron Lamb <ron.lamb@gmail.com>
+Date:   Sun Jun 14 15:54:00 2026 -0400
+
+    Merge branch 'main' into mac_mps_improvements
+
 commit 891adf955b68441afaf1c1d490dec921273785dd
 Merge: c9c3878 a86238d
 Author: Ron Lamb <ron.lamb@gmail.com>
