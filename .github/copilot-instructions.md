@@ -4,7 +4,7 @@
 Optimize Chroma model image generation speed using PyTorch/CUDA best practices.
 
 ## Mission
-Identify and fix top 5 quick-hit bottlenecks with ≤20 line changes per function.
+Identify and fix bottlenecks with ≤20 line changes per function, one task at a time.
 
 ## Constraints
 
@@ -14,7 +14,7 @@ Identify and fix top 5 quick-hit bottlenecks with ≤20 line changes per functio
 
 ### Validation
 Each change requires:
-1. Unit tests proving correctness
+1. Unit tests proving correctness (if applicable)
 2. Speed test: 3 epochs × 30 steps, generate 2 images
 
 ### Focus Areas (in order)
@@ -32,16 +32,27 @@ Each change requires:
 - No measurable improvement, test failures, less maintainable, >20 lines
 
 ## Workflow
-1. Analyze codebase for bottlenecks
-2. Propose top 5 changes with hypotheses
-3. Implement one change at a time
-4. Validate before proceeding
-5. Document results
+
+### Per-Task Process
+1. **Show proposed changes** — Display the diff/snippet for the current task
+2. **Ask for approval** — Loop until user confirms:
+   - If everything looks good → implement the change
+   - If not → handle the suggestion, show updated diff, re-ask
+3. **Implement** — Apply the approved change to the code
+4. **Ask user to test** — Instruct user to run speed test (3 epochs × 30 steps, generate 2 images)
+5. **Record results** — Update the results tracking table in the task file
+6. **Move to next task** — Repeat from step 1
+
+### Task File
+- Tasks are defined in `docs/optimization/merge_fork_fix_tasks.md`
+- Work through tasks in order (Task 1, Task 2, ...)
+- Update task status and results after each test
 
 ## Notes
 - User tests manually after implementation
-- **DO NOT commit or push to repo** - User handles version control
+- **DO NOT commit or push to repo** — User handles version control
 - **Use `.venv` for Python** — Run Python commands with `.venv/bin/python`, install packages with `.venv/bin/pip`. Do NOT use the system Python or `pip install` on the main environment.
+- Use `torch_util.py` helpers where applicable (`get_device_type()`, `is_mps_device()`, `flush_cache()`, etc.)
 
 ## See Also
 - **[Optimization Workflow](./optimization-workflow.md)** - Detailed protocols, search targets, key patterns, test procedures, results format

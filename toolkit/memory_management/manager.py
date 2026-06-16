@@ -1,6 +1,7 @@
 import torch
 from .manager_modules import LinearLayerMemoryManager, ConvLayerMemoryManager, _DEVICE_STATE
 import random
+from toolkit.basic import flush
 
 LINEAR_MODULES = [
     "Linear",
@@ -223,4 +224,4 @@ class MemoryManager:
         for key in keys_to_delete:
             del _DEVICE_STATE[key]
 
-        torch.cuda.empty_cache()
+        flush()

@@ -75,6 +75,4 @@ def unload_text_encoder(model: "BaseModel"):
                 dtype=model.torch_dtype
             )
 
-    torch.cuda.empty_cache()
-    gc.collect()
     flush()
