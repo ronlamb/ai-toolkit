@@ -196,29 +196,26 @@ class Chroma(nn.Module):
         img = self.img_in(img)
         txt = self.txt_in(txt)
 
-        # TODO:
-        # need to fix grad accumulation issue here for now it's in no grad mode
-        # besides, i don't want to wash out the PFP that's trained on this model weights anyway
-        # the fan out operation here is deleting the backward graph
-        # alternatively doing forward pass for every block manually is doable but slow
-        # custom backward probably be better
+        # Compute modulation vectors.
+        # The distilled_guidance_layer parameters need gradients, but we don't want
+        # to accumulate the full graph through the timestep/guidance embeddings.
+        # On MPS, torch.no_grad() + .requires_grad_(True) forces a command buffer sync
+        # every step, causing steady performance degradation. Using detach() + clone()
+        # avoids the in-place requires_grad_() call which is the sync trigger.
         with torch.no_grad():
             distill_timestep = timestep_embedding(timesteps, 16)
-            # TODO: need to add toggle to omit this from schnell but that's not a priority
             distil_guidance = timestep_embedding(guidance, 16)
-            # get all modulation index
             modulation_index = timestep_embedding(self.mod_index, 32)
-            # we need to broadcast the modulation index here so each batch has all of the index
             modulation_index = modulation_index.unsqueeze(0).repeat(img.shape[0], 1, 1)
-            # and we need to broadcast timestep and guidance along too
             timestep_guidance = (
                 torch.cat([distill_timestep, distil_guidance], dim=1)
                 .unsqueeze(1)
                 .repeat(1, self.mod_index_length, 1)
             )
-            # then and only then we could concatenate it together
             input_vec = torch.cat([timestep_guidance, modulation_index], dim=-1)
-            mod_vectors = self.distilled_guidance_layer(input_vec.requires_grad_(True))
+            mod_vectors = self.distilled_guidance_layer(input_vec)
+        # Detach to disconnect the graph, then clone with requires_grad for the layer params.
+        mod_vectors = mod_vectors.detach().clone().requires_grad_(True)
         mod_vectors_dict = distribute_modulations(mod_vectors, self.depth_single_blocks, self.depth_double_blocks)
 
         ids = torch.cat((txt_ids, img_ids), dim=1)
