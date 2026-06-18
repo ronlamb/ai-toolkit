@@ -8,19 +8,44 @@ Below are the baseline times before all changes described here.  These times wil
 determine whether a code change is bad or not.
 
 ```
-Training:   0%|          | 29/6000 [05:45<19:46:50, 11.93s/it, lr: 1.0e-04 loss: 4.103e-01]
-Samples:    Generating Samples:   0%|          | 0/2 [00:00<?, ?it/s]
-            Generating Samples:  50%|#####     | 1/2 [00:56<00:56, 56.42s/it]
-            Generating Samples: 100%|##########| 2/2 [01:53<00:00, 56.75s/it]
+Training:   0%|          | 29/24000 [05:33<76:37:59, 11.51s/it, lr: 1.0e-04 loss: 5.397e-01]
+Sampling:   Generating Samples:   0%|          | 0/2 [00:00<?, ?it/s]
+            Generating Samples:  50%|#####     | 1/2 [00:52<00:52, 52.15s/it]
+            Generating Samples: 100%|##########| 2/2 [01:45<00:00, 52.83s/it]
 
-Training:   1%|          | 59/6000 [11:39<19:34:06, 11.86s/it, lr: 1.0e-04 loss: 2.875e-01]
-Samples:    Generating Samples:   0%|          | 0/2 [00:00<?, ?it/s]
-            Generating Samples:  50%|#####     | 1/2 [00:56<00:56, 56.42s/it]
-            Generating Samples: 100%|##########| 2/2 [01:53<00:00, 56.62s/it]
+Training:   0%|          | 59/24000 [11:32<78:03:24, 11.74s/it, lr: 1.0e-04 loss: 2.708e-01]
+            Generating Samples:   0%|          | 0/2 [00:00<?, ?it/s]
+            Generating Samples:  50%|#####     | 1/2 [00:55<00:55, 55.25s/it]
+            Generating Samples: 100%|##########| 2/2 [01:50<00:00, 55.46s/it]
 
-Training:   1%|1         | 89/6000 [17:35<19:28:13, 11.86s/it, lr: 1.0e-04 loss: 2.951e-01]
-Samples:    Generating Samples:   0%|          | 0/2 [00:00<?, ?it/s]
-            Generating Samples:  50%|#####     | 1/2 [00:57<00:57, 57.75s/it]
-            Generating Samples: 100%|##########| 2/2 [01:55<00:00, 57.91s/it]
+Training:   0%|          | 89/24000 [17:36<78:49:14, 11.87s/it, lr: 1.0e-04 loss: 3.594e-01]
+Sampling:   Generating Samples:   0%|          | 0/2 [00:00<?, ?it/s]
+            Generating Samples:  50%|#####     | 1/2 [00:55<00:55, 55.26s/it]
+            Generating Samples: 100%|##########| 2/2 [01:50<00:00, 55.39s/it]
+
+Training:   0%|          | 119/24000 [23:37<79:01:41, 11.91s/it, lr: 1.0e-04 loss: 2.849e-01]
+Sampling:   Generating Samples:   0%|          | 0/2 [00:00<?, ?it/s]
+            Generating Samples:  50%|#####     | 1/2 [00:54<00:54, 54.95s/it]
+            Generating Samples: 100%|##########| 2/2 [01:50<00:00, 55.03s/it]
+
+Training:   1%|          | 149/24000 [29:40<79:10:10, 11.95s/it, lr: 1.0e-04 loss: 3.374e-01]
+Sampling:   Generating Samples:   0%|          | 0/2 [00:00<?, ?it/s]
+            Generating Samples:  50%|#####     | 1/2 [00:54<00:54, 54.96s/it]
+            Generating Samples: 100%|##########| 2/2 [01:50<00:00, 55.04s/it]
+
+Training:   1%|          | 179/24000 [35:39<79:05:42, 11.95s/it, lr: 1.0e-04 loss: 3.181e-01]
+Sampling:   Generating Samples:   0%|          | 0/2 [00:00<?, ?it/s]
+            Generating Samples:  50%|#####     | 1/2 [00:54<00:54, 54.81s/it]
+            Generating Samples: 100%|##########| 2/2 [01:49<00:00, 55.02s/it]
+
+Training:   1%|          | 209/24000 [41:39<79:02:03, 11.96s/it, lr: 1.0e-04 loss: 3.457e-01]
+Sampling:   Generating Samples:   0%|          | 0/2 [00:00<?, ?it/s]
+            Generating Samples:  50%|#####     | 1/2 [00:54<00:54, 54.87s/it]
+            Generating Samples: 100%|##########| 2/2 [01:50<00:00, 55.34s/it]
+
+Training:   1%|          | 239/24000 [47:42<79:03:03, 11.98s/it, lr: 1.0e-04 loss: 3.115e-01]
+Sampling:   Generating Samples:   0%|          | 0/2 [00:00<?, ?it/s]
+            Generating Samples:  50%|#####     | 1/2 [00:54<00:54, 54.96s/it]
+            Generating Samples: 100%|##########| 2/2 [01:50<00:00, 55.05s/it]
 ```
 
