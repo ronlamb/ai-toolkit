@@ -133,11 +133,11 @@ Each change requires:
 
 **Problem:** `flush()` calls `gc.collect()` which blocks the MPS command queue. Called on every save/sample step.
 
-**Change:** Pass `garbage_collect=False` to `flush()` in hot path, or reduce frequency.
+**Change:** Pass `garbage_collect=False` to `flush()` in hot path (after save steps, first flush). GC still runs on save/sample/OOM paths.
 
 **Expected impact:** ★★ (reduces blocking GC pauses)
 
-**Status:** Not started
+**Status:** PASS — Training: 12.1→11.97 s/it (stable, -1.1%). Sampling: 55.0→54.8 s/it (stable). No degradation over 12 checkpoints.
 **Result:**
 
 ---

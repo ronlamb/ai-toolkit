@@ -54,6 +54,11 @@ Each change requires:
 - **Use `.venv` for Python** — Run Python commands with `.venv/bin/python`, install packages with `.venv/bin/pip`. Do NOT use the system Python or `pip install` on the main environment.
 - Use `torch_util.py` helpers where applicable (`get_device_type()`, `is_mps_device()`, `flush_cache()`, etc.)
 
+## Agent Behavior Rules
+- **Check tool outputs carefully** — If a tool call seems to return nothing but you expect results, the output may be in the tool reply. Ask the user to check debug view if unsure.
+- **Don't overthink — just try it** — If unsure whether a change will help, implement it. We can always revert. Don't loop between "should I do this?" and "maybe not."
+- **Ask for git commit before uncertain changes** — If you're not confident a change will work, ask the user to `git commit` the current state first so they can easily revert.
+
 ## See Also
 - **[Optimization Workflow](./optimization-workflow.md)** - Detailed protocols, search targets, key patterns, test procedures, results format
 - **[Optimization Documentation Skill](./skills/optimization-documentation/SKILL.md)** - Generate standardized change templates, results tracking, and checklists

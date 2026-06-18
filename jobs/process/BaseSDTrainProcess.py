@@ -2330,7 +2330,9 @@ class BaseSDTrainProcess(BaseTrainProcess):
                 self.optimizer.optimizer.swap_paramiters()
             self.timer.start('train_loop')
             if flush_next:
-                flush()
+                # Skip gc.collect() in hot path — it blocks MPS command queue.
+                # MPS empty_cache is enough; GC will run naturally or on save/sample.
+                flush(garbage_collect=False)
                 flush_next = False
             if self.train_config.do_random_cfg:
                 self.train_config.do_cfg = True
@@ -2457,7 +2459,8 @@ class BaseSDTrainProcess(BaseTrainProcess):
                 print(self.torch_profiler.key_averages().table(sort_by="cpu_time_total", row_limit=1000))
             self.timer.stop('train_loop')
             if not did_first_flush:
-                flush()
+                # Skip gc.collect() on first flush — MPS doesn't need it.
+                flush(garbage_collect=False)
                 did_first_flush = True
             # flush()
             # setup the networks to gradient checkpointing and everything works
