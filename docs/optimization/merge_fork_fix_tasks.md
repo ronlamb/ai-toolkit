@@ -40,7 +40,21 @@ Each change requires:
 
 **Expected impact:** ★★★ (eliminates 3 tensor allocations + device transfers per forward pass)
 
-**Status:** Not started
+**Status:** PASS — Training: 12.03→12.11 s/it (stable). Sampling: 54.6→55.3 s/it (stable). No degradation over 8 checkpoints.
+**Result:**
+
+---
+
+### Task 1b: Cache `rope` omega tensor
+**File:** `extensions_built_in/diffusion_models/chroma/src/math.py:33-45`
+
+**Problem:** `scale` and `omega` tensors are constant for a given `(dim, theta)` but allocated fresh every call via `torch.arange(..., device=pos.device)` and `theta**scale`. Called 3× per forward pass (once per axis in `EmbedND`).
+
+**Change:** Cache `omega` in a module-level dict keyed by `(dim, theta, device)`. Create `scale` directly on target device.
+
+**Expected impact:** ★★ (eliminates 3 tensor allocations + power computations per forward pass)
+
+**Status:** Neutral — Training: 12.18 s/it (same as Task 1 baseline). Sampling: 55.3 s/it (same). Stable, no regression. Small tensor allocations not the bottleneck here.
 **Result:**
 
 ---

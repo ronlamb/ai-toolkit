@@ -28,6 +28,12 @@ class EmbedND(nn.Module):
         return emb.unsqueeze(1)
 
 
+# Cache for freqs tensors: (dim, max_period, device) -> freqs tensor.
+# freqs is constant for a given (dim, max_period) — no need to recompute + transfer
+# every call. Small tensors (~8-16 floats), so no memory pressure.
+_timestep_embedding_cache: dict[tuple, Tensor] = {}
+
+
 def timestep_embedding(t: Tensor, dim, max_period=10000, time_factor: float = 1000.0):
     """
     Create sinusoidal timestep embeddings.
@@ -39,11 +45,15 @@ def timestep_embedding(t: Tensor, dim, max_period=10000, time_factor: float = 10
     """
     t = time_factor * t
     half = dim // 2
-    freqs = torch.exp(
-        -math.log(max_period)
-        * torch.arange(start=0, end=half, dtype=torch.float32)
-        / half
-    ).to(t.device)
+    cache_key = (dim, max_period, t.device)
+    freqs = _timestep_embedding_cache.get(cache_key)
+    if freqs is None:
+        freqs = torch.exp(
+            -math.log(max_period)
+            * torch.arange(start=0, end=half, dtype=torch.float32, device=t.device)
+            / half
+        )
+        _timestep_embedding_cache[cache_key] = freqs
 
     args = t[:, None].float() * freqs[None]
     embedding = torch.cat([torch.cos(args), torch.sin(args)], dim=-1)
