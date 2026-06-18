@@ -314,7 +314,7 @@ Code called more than once within a single module.
 
 ---
 
-### Pattern A: MPS Latent Image IDs Handling (Chroma Pipeline)
+### Pattern 12: MPS Latent Image IDs Handling (Chroma Pipeline)
 
 **Location:** `extensions_built_in/diffusion_models/chroma/pipeline.py`
 
@@ -349,4 +349,4 @@ else:
 | 9 | MPS float safety | 2 | 2 | `mps_safe_float()` |
 | 10 | CUDA/MPS synchronize | 1 | 1 | `synchronize()` |
 | 11 | CUDA IPC collect | 1 | 1 | `flush_cuda_ipc()` |
-| A | MPS latent IDs (intra-module) | 1 | 2 | Move into `prepare_latent_image_ids()` |
+| 12 | MPS latent IDs (intra-module) | 1 | 2 | Move into `prepare_latent_image_ids()` |

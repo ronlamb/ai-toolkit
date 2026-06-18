@@ -1,37 +1,48 @@
 # Ernie Image Model - Modules Called During Training and Sampling
 # Source: gpu_checks_all.txt, traced from run.py entry point
+# Updated: 2026-06-18 after upstream pull request
 
 ## Ernie Image-Specific Modules
-./extensions_built_in/diffusion_models/ernie_image/ernie_image.py
+extensions_built_in/diffusion_models/ernie_image/ernie_image.py
 
 ## Shared Toolkit Modules (called by all models)
-./toolkit/config_modules.py
-./toolkit/control_generator.py
-./toolkit/dataloader_mixins.py
-./toolkit/dequantize.py
-./toolkit/embedding.py
-./toolkit/image_utils.py
-./toolkit/ip_adapter.py
-./toolkit/kohya_lora.py
-./toolkit/kohya_model_util.py
-./toolkit/layers.py
-./toolkit/llvae.py
-./toolkit/lorm.py
-./toolkit/losses.py
-./toolkit/lycoris_utils.py
-./toolkit/memory_management/manager.py
-./toolkit/memory_management/manager_modules.py
-./toolkit/models/FakeVAE.py
-./toolkit/models/base_model.py
-./toolkit/models/diffusion_feature_extraction.py
-./toolkit/network_mixins.py
-./toolkit/optimizers/optimizer_utils.py
+toolkit/audio/preserve_pitch.py
+toolkit/basic.py
+toolkit/clip_vision_adapter.py
+toolkit/control_generator.py
+toolkit/custom_adapter.py
+toolkit/dataloader_mixins.py
+toolkit/guidance.py
+toolkit/ip_adapter.py
+toolkit/kohya_lora.py
+toolkit/lorm.py
+toolkit/models/DoRA.py
+toolkit/models/base_model.py
+toolkit/models/control_lora_adapter.py
+toolkit/models/flux.py
+toolkit/models/i2v_adapter.py
+toolkit/models/llm_adapter.py
+toolkit/models/lokr.py
+toolkit/models/mean_flow_adapter.py
+toolkit/models/pixtral_vision.py
+toolkit/models/sapiens2.py
+toolkit/models/subpixel_adapter.py
+toolkit/models/te_adapter.py
+toolkit/models/wan21/wan_utils.py
+toolkit/network_mixins.py
+toolkit/pipelines.py
+toolkit/pixel_shuffle_encoder.py
+toolkit/prompt_utils.py
+toolkit/reference_adapter.py
+toolkit/samplers/custom_flowmatch_sampler.py
+toolkit/samplers/custom_lcm_scheduler.py
+toolkit/samplers/mean_flow_scheduler.py
+toolkit/saving.py
+toolkit/stable_diffusion_model.py
+toolkit/train_tools.py
+toolkit/util/mask.py
+toolkit/util/quantize.py
 
 ## Shared Jobs/Process Modules (called during training)
-./jobs/ExtensionJob.py
-./jobs/TrainJob.py
-./jobs/process/BaseSDTrainProcess.py
-./jobs/process/TrainSDRescaleProcess.py
-
-## Shared UI Entry Point
-./flux_train_ui.py
+jobs/process/BaseSDTrainProcess.py
+jobs/process/BaseTrainProcess.py

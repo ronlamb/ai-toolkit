@@ -106,7 +106,7 @@ These rules were discovered through systematic testing. Apply them when refactor
 
 ## Utility file
 
-`torch_util.py` already exists in `toolkit/util/` with these functions:
+`torch_util.py` Has been created in `toolkit/util/` with these functions:
 - `get_device_type()`, `is_cuda_device()`, `is_mps_device()`
 - `is_cuda_available()`, `is_mps_available()`, `get_default_device()`
 - `save_rng_state()`, `restore_rng_state()`, `set_seed()`
