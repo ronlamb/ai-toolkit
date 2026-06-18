@@ -79,13 +79,41 @@ The code cleanup plan will go module by module, and will for each module, one by
         - If performance degrades, check logic to see if it can be fixed.
             - If not then revert the change.
 
+## MPS Lessons Learned (from merge_fork_fix_tasks.md)
+
+These rules were discovered through systematic testing. Apply them when refactoring device checks.
+
+### What Works on MPS
+- **Small cached constant tensors** — freqs, omega, etc. keyed by (shape, device) are safe and helpful
+- **`detach().clone().requires_grad_(True)` outside `no_grad`** — avoids MPS command buffer sync every step
+- **Skipping `gc.collect()` in hot paths** — reduces blocking pauses
+- **Avoiding bf16↔fp32 round-trips** — expensive on MPS (57× per forward pass in Chroma)
+- **`torch_util.py` helpers** — `is_mps_device()`, `get_text_dtype()`, `flush_cache(garbage_collect=False)`
+
+### What Fails on MPS (Avoid These)
+- **Persistent buffers for large tensors** — pins MPS memory, makes fragmentation worse (Task 8: +1.1 s/it)
+- **Python micro-optimizations** — string matching, loop unrolling, index pre-computation add overhead (Tasks 3, 5, 6)
+- **`spawn` multiprocessing workers** — can't share MPS tensor storage (Task 10: crash)
+- **`.item()` in loops** — forces CPU sync per element
+- **Direct device allocation** — sometimes regresses vs CPU-then-transfer (Task 5)
+- **`.requires_grad_(True)` inside `torch.no_grad()`** — forces MPS command buffer sync every step (Task 4 root cause)
+
+### MPS-Specific Validation Rules
+1. **Measure after warmup** — MPS has warmup behavior; first iterations are slower
+2. **Test stability over time** — check 8+ checkpoints, not just first epoch
+3. **Check for degradation** — steady s/it increase indicates MPS sync or memory leak
+4. **Sampling stability matters** — training speed gains mean nothing if sampling degrades
+
 ## Utility file
 
-A new python module `torch_util.py` in the `toolkit/util` directory will be created.  Please feel free to come up with a better more standard name.
+`torch_util.py` already exists in `toolkit/util/` with these functions:
+- `get_device_type()`, `is_cuda_device()`, `is_mps_device()`
+- `is_cuda_available()`, `is_mps_available()`, `get_default_device()`
+- `save_rng_state()`, `restore_rng_state()`, `set_seed()`
+- `get_autocast_context()`, `get_text_dtype()`, `mps_safe_float()`
+- `synchronize()`, `flush_cuda_ipc()`, `flush_cache(garbage_collect=True)`
 
-It will contain the following types functions.
-- Functions that gets the current device type: `cpu`, `cuda`, `mps`, etc.
-- Common routines and functions 
+**Don't duplicate** — use existing helpers. Add new ones only if a pattern appears in 3+ modules.
 
 ## Files to check gpu_checks.txt
 
@@ -97,5 +125,7 @@ Each epoch consists of
 - 2 sample images, sampled at 4 steps
 
 Use the baseline times in `mac-results.md` to determine whether a change adversely affected performance.
+
+**Current baseline (after all optimizations):** ~11.97 s/it training, ~54.8 s/it sampling, stable over 12+ checkpoints.
 
 
