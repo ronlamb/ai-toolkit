@@ -179,7 +179,7 @@ Each change requires:
 
 **Expected impact:** ★ (unblocks training loop from I/O)
 
-**Status:** Not started
+**Status:** Reverted — `spawn` workers can't share MPS tensor storage (`RuntimeError: _share_filename_: only available on CPU`). Fundamental MPS limitation.
 **Result:**
 
 ---
