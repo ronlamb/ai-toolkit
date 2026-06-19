@@ -462,12 +462,34 @@ with torch.autocast(device.type, dtype=dtype):
 | 2 | `device.type == "mps"` | 5 | 8 | `is_mps_device()` | ✅ In torch_util |
 | 3 | RNG state save/restore | 4 | 5 | `save_rng_state()` / `restore_rng_state()` | ✅ In torch_util |
 | 4 | CUDA seed after CPU seed | 5 | 6+ | `set_seed()` | ✅ In torch_util |
-| 5 | Autocast context check | 2 | 3 | `get_autocast_context()` | ✅ In torch_util |
+| 5 | Autocast context check | 2 | 3 | `get_autocast_context()` | ⚠️ Hot path only — see below |
 | 6 | Default device selection | 6 | 10+ | `get_default_device()` | ✅ In torch_util |
 | 7 | MPS dtype fallback (text) | 1 | 1 | `get_text_dtype()` | ✅ In torch_util |
 | 8 | CUDA device type check | 2 | 7 | `is_cuda_device()` | ✅ In torch_util |
 | 9 | MPS float safety | 2 | 2 | `mps_safe_float()` | ✅ In torch_util |
 | 10 | CUDA/MPS synchronize | 1 | 1 | `synchronize()` | ✅ In torch_util |
+
+---
+
+## Lessons Learned
+
+### Hot Path Overhead (Chroma layers.py — REVERTED)
+
+Replacing an inline conditional with `get_autocast_context()` in `chroma/src/layers.py` caused **+0.35s/it degradation** by step 119.
+
+**Root cause:** Python function call overhead in a hot path (called every forward pass). The inline conditional was faster.
+
+**Rule:** Keep inline conditionals in tight loops / hot paths. Utility functions are fine for setup/teardown code but add measurable overhead per call in training loops.
+
+| Pattern | Safe to Replace? | Reason |
+|---------|-----------------|--------|
+| `device.type == "mps"` | ❌ No | Simple comparison, function call adds overhead |
+| `torch.backends.mps.is_available()` | ❌ No | Simple check, function call adds overhead |
+| `device == torch.device("cpu")` | ❌ No | Simple equality, function call adds overhead |
+| `get_autocast_context()` | ❌ Hot path only | +0.35s/it in Chroma training loop |
+| `save_rng_state()` / `restore_rng_state()` | ✅ Yes | Called once per checkpoint, not per step |
+| `set_seed()` | ✅ Yes | Called once at startup |
+| `flush_cache()` | ✅ Yes | Called infrequently |
 | 11 | CUDA IPC collect | 1 | 1 | `flush_cuda_ipc()` | ✅ In torch_util |
 | 12 | MPS latent IDs (intra-module) | 1 | 2 | Move into `prepare_latent_image_ids()` | ⏳ Needs refactor |
 | 13 | Tensor `.is_cuda` attribute | 1 | 1 | Use `is_cuda_device()` | ⏳ Needs update |
