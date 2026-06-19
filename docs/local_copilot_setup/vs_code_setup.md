@@ -15,7 +15,7 @@ Replace the base url with your appropriate url and the model.
 ```json
 [
 	{
-		"name": "Qwen Coder",
+		"name": "LM Studio",
 		"vendor": "customendpoint",
 		"apiKey": "${input:chat.lm.secret.-4a10782c}",
 		"apiType": "chat-completions",
@@ -29,18 +29,20 @@ Replace the base url with your appropriate url and the model.
 				// 74K context window
 				"maxInputTokens": 65536,
 				"maxOutputTokens": 8096
-			}
-		]
-	},
-		{
-		"name": "Gemma 4B",
-		"vendor": "customendpoint",
-		"apiKey": "${input:chat.lm.secret.-4a10782c}",
-		"apiType": "chat-completions",
-		"models": [
+			},
+			{
+				"id": "qwen/qwen3.6-27b",
+				"name": "Qwen 3.6 27B",
+				"url": "http://127.0.0.1:1234",
+				"toolCalling": true,
+				"vision": true,
+				// 90K context window
+				"maxInputTokens": 131072,
+				"maxOutputTokens": 12288
+			},
 			{
 				"id": "google/gemma-4-e2b",
-				"name": "Gemma 4 E2B",
+				"name": "Gemma4 E2B",
 				"url": "http://127.0.0.1:1234",
 				"toolCalling": true,
 				"vision": true,
@@ -66,3 +68,29 @@ Under Settings -> Chat set all the following to your Coding Model
 
 Credits: 37% used: 73.9/200
 Inline Suggestions: 17% used: 356/200 as of 6/7 01:10
+
+# Example setting.json
+
+```json
+{
+    "workbench.colorTheme": "Dark+",
+    "security.workspace.trust.untrustedFiles": "open",
+    "editor.wordWrap": "on",
+    "github.copilot.chat.agentDebugLog.fileLogging.enabled": true,
+    "github.copilot.enable": {
+        "*": true,
+        "plaintext": false,
+        "markdown": false,
+        "scminput": false
+    },
+    "inlineChat.defaultModel": "Qwen 3.6 27B (customendpoint)",
+    "chat.planAgent.defaultModel": "Qwen 3.6 27B (customendpoint)",
+    "chat.agent.maxRequests": 70,
+    "editor.pasteAs.preferences": [
+        "text.plain"
+    ],
+    "@azure.argTenant": "",
+    "chat.utilityModel": "customendpoint/qwen/qwen3.6-27b",
+    "chat.utilitySmallModel": "customendpoint/google/gemma-4-e2b"
+}
+```

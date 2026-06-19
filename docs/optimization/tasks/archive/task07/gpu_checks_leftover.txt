@@ -1,0 +1,137 @@
+# GPU Check Files NOT Called by Any of the 5 Target Models
+# Target models: chroma, flux2, ernie_image, hidream, z_image
+# These files are in gpu_checks_all.txt but are not in the call chain for these models
+# Updated: 2026-06-18 after upstream pull request
+
+## Audio Models (not in target set)
+extensions_built_in/audio_models/ace_step/ace_step_15_model.py
+extensions_built_in/audio_models/ace_step/src/model.py
+extensions_built_in/audio_models/ace_step/src/pipeline.py
+extensions_built_in/audio_models/base_audio_model.py
+
+## Captioner Models (not in target set)
+extensions_built_in/captioner/AceStepCaptioner.py
+extensions_built_in/captioner/Ideogram4Captioner.py
+extensions_built_in/captioner/Qwen3VLCaptioner.py
+
+## Other Diffusion Models (not in target set)
+extensions_built_in/diffusion_models/chroma/chroma_radiance_model.py
+extensions_built_in/diffusion_models/example_model/example_model.py
+extensions_built_in/diffusion_models/example_model/src/pipeline.py
+extensions_built_in/diffusion_models/f_light/f_light.py
+extensions_built_in/diffusion_models/f_light/src/model.py
+extensions_built_in/diffusion_models/f_light/src/pipeline.py
+extensions_built_in/diffusion_models/flux2/flux2_klein_model.py
+extensions_built_in/diffusion_models/flux_kontext/flux_kontext.py
+extensions_built_in/diffusion_models/hidream/hidream_e1_model.py
+extensions_built_in/diffusion_models/hidream/hidream_o1_model.py
+extensions_built_in/diffusion_models/hidream/src/hidream_o1/pipeline.py
+extensions_built_in/diffusion_models/hidream/src/hidream_o1/qwen3_vl_transformers.py
+extensions_built_in/diffusion_models/hidream/src/pipelines/hidream_image/pipeline_hidream_image_editing.py
+extensions_built_in/diffusion_models/hidream/src/schedulers/flash_flow_match.py
+extensions_built_in/diffusion_models/ideogram4/ideogram4.py
+extensions_built_in/diffusion_models/ideogram4/src/pipeline.py
+extensions_built_in/diffusion_models/ideogram4/src/transformer.py
+extensions_built_in/diffusion_models/ltx2/ltx2.py
+extensions_built_in/diffusion_models/nucleus_image/nucleus_image_model.py
+extensions_built_in/diffusion_models/omnigen2/__init__.py
+extensions_built_in/diffusion_models/omnigen2/src/models/embeddings.py
+extensions_built_in/diffusion_models/omnigen2/src/models/transformers/repo.py
+extensions_built_in/diffusion_models/omnigen2/src/ops/triton/layer_norm.py
+extensions_built_in/diffusion_models/omnigen2/src/pipelines/omnigen2/pipeline_omnigen2.py
+extensions_built_in/diffusion_models/omnigen2/src/pipelines/omnigen2/pipeline_omnigen2_chat.py
+extensions_built_in/diffusion_models/omnigen2/src/pipelines/pipeline_utils.py
+extensions_built_in/diffusion_models/omnigen2/src/schedulers/scheduling_dpmsolver_multistep.py
+extensions_built_in/diffusion_models/omnigen2/src/schedulers/scheduling_flow_match_euler_discrete.py
+extensions_built_in/diffusion_models/prx_pixel_t2i/prx_pixel_t2i.py
+extensions_built_in/diffusion_models/prx_pixel_t2i/src/pipeline.py
+extensions_built_in/diffusion_models/prx_pixel_t2i/src/transformer_prx.py
+extensions_built_in/diffusion_models/qwen_image/qwen_image.py
+extensions_built_in/diffusion_models/qwen_image/qwen_image_edit.py
+extensions_built_in/diffusion_models/qwen_image/qwen_image_edit_plus.py
+extensions_built_in/diffusion_models/qwen_image/qwen_image_pipelines.py
+extensions_built_in/diffusion_models/wan22/wan22_14b_i2v_model.py
+extensions_built_in/diffusion_models/wan22/wan22_14b_model.py
+extensions_built_in/diffusion_models/wan22/wan22_5b_model.py
+extensions_built_in/diffusion_models/wan22/wan22_pipeline.py
+extensions_built_in/diffusion_models/z_image/z_image_l2p_model.py
+extensions_built_in/diffusion_models/zeta_chroma/zeta_chroma_model.py
+extensions_built_in/diffusion_models/zeta_chroma/zeta_chroma_pipeline.py
+extensions_built_in/diffusion_models/zeta_chroma/zeta_chroma_transformer.py
+
+## Non-Training/Non-Sampling Extensions & Jobs
+extensions/example/ExampleMergeModels.py
+extensions_built_in/advanced_generator/Img2ImgGenerator.py
+extensions_built_in/advanced_generator/PureLoraGenerator.py
+extensions_built_in/advanced_generator/ReferenceGenerator.py
+extensions_built_in/concept_replacer/ConceptReplacer.py
+extensions_built_in/concept_slider/ConceptSliderTrainer.py
+extensions_built_in/dataset_tools/DatasetTools.py
+extensions_built_in/dataset_tools/SuperTagger.py
+extensions_built_in/dataset_tools/SyncFromCollection.py
+extensions_built_in/dataset_tools/tools/fuyu_utils.py
+extensions_built_in/dataset_tools/tools/llava_utils.py
+extensions_built_in/flex2/flex2.py
+extensions_built_in/flex2/pipeline.py
+extensions_built_in/image_reference_slider_trainer/ImageReferenceSliderTrainerProcess.py
+extensions_built_in/sd_trainer/SDTrainer.py
+extensions_built_in/ultimate_slider_trainer/UltimateSliderTrainerProcess.py
+jobs/process/GenerateProcess.py
+jobs/process/ModRescaleLoraProcess.py
+jobs/process/TrainESRGANProcess.py
+jobs/process/TrainSDRescaleProcess.py
+jobs/process/TrainSliderProcess.py
+jobs/process/TrainSliderProcessOld.py
+jobs/process/TrainVAEProcess.py
+jobs/process/models/critic.py
+jobs/process/models/vgg19_critic.py
+
+## Scripts (not called during training/sampling)
+scripts/calculate_timestep_weighing_flex.py
+scripts/caption_audio_dataset.py
+scripts/convert_cog.py
+scripts/extract_lora_from_flex.py
+
+## Testing Files
+testing/generate_weight_mappings.py
+testing/shrink_pixart_sm.py
+testing/shrink_pixart_sm2.py
+testing/shrink_pixart_sm3.py
+testing/test_vae.py
+testing/test_vae_cycle.py
+
+## Toolkit Files (not imported by target models)
+toolkit/ema.py
+toolkit/embedding.py
+toolkit/image_utils.py
+toolkit/inversion_utils.py
+toolkit/kohya_model_util.py
+toolkit/layers.py
+toolkit/llvae.py
+toolkit/losses.py
+toolkit/lycoris_utils.py
+toolkit/memory_management/manager_modules.py
+toolkit/memory_management/test_memory_manager.py
+toolkit/models/FakeVAE.py
+toolkit/models/auraflow.py
+toolkit/models/cogview4.py
+toolkit/models/diffusion_feature_extraction.py
+toolkit/models/tipsv2.py
+toolkit/models/wan21/autoencoder_kl_wan.py
+toolkit/models/wan21/wan21.py
+toolkit/models/wan21/wan21_i2v.py
+toolkit/optimizer.py
+toolkit/optimizers/automagic.py
+toolkit/optimizers/automagic3.py
+toolkit/optimizers/optimizer_utils.py
+toolkit/optimizers/prodigy_8bit.py
+toolkit/optimizers/test_optimizers.py
+toolkit/photomaker_pipeline.py
+toolkit/style.py
+toolkit/train_pipelines.py
+toolkit/util/blended_blur_noise.py
+toolkit/util/losses.py
+toolkit/util/torch_util.py
+
+## UI Entry (not in call chain for training/sampling)
+flux_train_ui.py

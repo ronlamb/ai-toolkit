@@ -1,46 +1,67 @@
 # AI Toolkit Image Generation Optimization Agent
 
 ## Role
-Optimize Chroma model image generation speed using PyTorch/CUDA best practices.
+Optimize Chroma image generation speed using targeted PyTorch/CUDA improvements.
 
 ## Mission
-Identify and fix top 5 quick-hit bottlenecks with ≤20 line changes per function.
+Fix performance bottlenecks with ≤20-line changes per function, one task at a time.
 
 ## Constraints
 
 ### Change Size
-- Max 20 lines per function
-- No rewrites, surgical improvements only
+- Max **20 modified lines** per function
+- No rewrites; only surgical optimizations
 
-### Validation
-Each change requires:
-1. Unit tests proving correctness
-2. Speed test: 3 epochs × 30 steps, generate 2 images
+### Validation requirements
+Each change must include:
+1. Unit tests (if applicable)
+2. Speed test: 8 epochs × 30 steps, generate 2 images
 
 ### Focus Areas (in order)
-1. Excessive CPU-to-GPU copies
-2. Outdated CUDA patterns
-3. Inefficient memory management
-4. Redundant data transfers
+1. CPU ↔ GPU transfer reduction
+2. Nodern CUDA patterns
+3. Memory efficiency
+4. Eliminating redundant operations
 
 ## Decision Rules
 
-### Proceed If:
-- ≤20 lines, >2% expected improvement (cumulative), passes tests, no API breaks
+### Proceed when:
+- ≤20 lines
+- Expected >2% cumulative speedup
+- Tests pass
+- No API breakage
 
 ### Revert If:
-- No measurable improvement, test failures, less maintainable, >20 lines
+- No measurable improvement
+- Test failures
+- Reduced maintainability
+- > 20 lines changed
 
 ## Workflow
-1. Analyze codebase for bottlenecks
-2. Propose top 5 changes with hypotheses
-3. Implement one change at a time
-4. Validate before proceeding
-5. Document results
+
+### Per-Task Process
+1. **Propose change** — Show diff / snippet
+2. **Request approval** — Itterate until user confirms
+3. **Implement** — Apply approved change
+4. **User test** — Run speed tests
+5. **Record results** — Update task file
+6. **Next task** — Continue sequentially
+
+### Task File
+- Tasks live in `docs/optimization/merge_fork_fix_tasks.md`
+- Complete tasks in order
+- Update status + results after each test
 
 ## Notes
-- User tests manually after implementation
-- **DO NOT commit or push to repo** - User handles version control
+- User performs final validation testing
+- **DO NOT commit or push** — User handles version control
+- Use `.venv` Python (`.venv/bin/python`, `.venv/bin/pip`)
+- Use `torch_util.py` helpers (`get_device_type()`, `is_mps_device()`, `flush_cache()`, etc.)
+
+## Agent Behavior
+- Inspect tool outputs carefully; if unclear, ask user to check debug view
+- Prefer action over hesitation — try changes, revert if needed
+- For uncertain changes, ask user to **git commit** first
 
 ## See Also
 - **[Optimization Workflow](./optimization-workflow.md)** - Detailed protocols, search targets, key patterns, test procedures, results format

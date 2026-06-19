@@ -67,7 +67,8 @@ When working with MPS (Apple Silicon) performance in the AI Toolkit codebase, fo
 
 See the following for the current status of all MPS optimizations:
 - [mac-results.md](./mac-results.md) - Detailed test results for each change
-- [mac-change-6.md](./mac-change-6.md) - Missing MPS logic analysis (Change #6)
+  - Update this as each change is completed.
+- [mac-change-6.md](./tasks/archive/mac-change-6.md) - Missing MPS logic analysis (Change #6)
 
 ---
 

@@ -112,6 +112,7 @@ def get_format_params(dtype: torch.dtype) -> tuple[int, int]:
         return 0, 8  # Int8 doesn't have mantissa bits
     else:
         raise ValueError(f"Unsupported dtype: {dtype}")
+
     
 def copy_stochastic_bf16(target: torch.Tensor, source: torch.Tensor):
     # reinterpret FP32 as int32 (zero-copy)

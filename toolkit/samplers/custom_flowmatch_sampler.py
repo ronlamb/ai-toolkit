@@ -83,10 +83,8 @@ class CustomFlowMatchEulerDiscreteScheduler(FlowMatchEulerDiscreteScheduler):
         if timestep_type == "weighted":
             weights = self._default_weighing_tensor_cached[step_indices]
         elif v2:
-            # weights = self.linear_timesteps_weights2[step_indices].flatten()
             weights = self._linear_timesteps_weights2_cached[step_indices]
         else:
-            # weights = self.linear_timesteps_weights[step_indices].flatten()
             weights = self._linear_timesteps_weights_cached[step_indices]
         return weights
 

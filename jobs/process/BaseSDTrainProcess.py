@@ -505,10 +505,8 @@ class BaseSDTrainProcess(BaseTrainProcess):
                 # Clear the cache to prevent memory accumulation
                 self.sd.sample_prompts_cache = None
             
-            # Clean up CUDA cache
-            import torch
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
+            # Clean up cache
+            flush()
         
         # Track current epoch for next comparison
         self.prev_epoch_num = self.epoch_num
@@ -2332,7 +2330,9 @@ class BaseSDTrainProcess(BaseTrainProcess):
                 self.optimizer.optimizer.swap_paramiters()
             self.timer.start('train_loop')
             if flush_next:
-                flush()
+                # Skip gc.collect() in hot path — it blocks MPS command queue.
+                # MPS empty_cache is enough; GC will run naturally or on save/sample.
+                flush(garbage_collect=False)
                 flush_next = False
             if self.train_config.do_random_cfg:
                 self.train_config.do_cfg = True
@@ -2428,7 +2428,7 @@ class BaseSDTrainProcess(BaseTrainProcess):
                 did_oom = True
             except RuntimeError as e:
                 error_str = str(e).lower()
-                if "cuda out of memory" in error_str or "mps out of memory" in error_str or "metal" in error_str or "allocatebuffer" in error_str:
+                if "out of memory" in error_str or "allocatebuffer" in error_str or "invalid buffer size" in error_str:
                     did_oom = True
                 else:
                     raise  # not an OOM; surface real errors
@@ -2459,7 +2459,8 @@ class BaseSDTrainProcess(BaseTrainProcess):
                 print(self.torch_profiler.key_averages().table(sort_by="cpu_time_total", row_limit=1000))
             self.timer.stop('train_loop')
             if not did_first_flush:
-                flush()
+                # Skip gc.collect() on first flush — MPS doesn't need it.
+                flush(garbage_collect=False)
                 did_first_flush = True
             # flush()
             # setup the networks to gradient checkpointing and everything works
