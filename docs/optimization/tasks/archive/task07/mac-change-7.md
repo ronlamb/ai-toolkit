@@ -119,6 +119,38 @@ These rules were discovered through systematic testing. Apply them when refactor
 
 ## Validate against baseline
 
+## Results
+
+**Status:** ✅ Complete — Analysis done, no code changes applied.
+
+### Deliverables
+- **Step 1:** Module inventories created for all 5 models in `docs/optimization/models/`
+- **Step 2:** 18 device check patterns cataloged in `common_device_checks.md`
+- **Step 3:** Per-model cleanup plans created; all changes evaluated and skipped/reverted
+
+### Key Findings
+- **18 distinct device check patterns** found across 5 model directories and shared toolkit modules
+- **`torch_util.py`** created with utility functions for non-hot-path use (RNG, seeding, cache flushing)
+- **Simple wrappers add overhead** — `is_mps_device()`, `is_cpu_device()`, `get_autocast_context()` all cause measurable regression in hot paths (+0.35s/it for autocast in Chroma)
+- **Lesson:** Keep inline conditionals in training loops; use utilities only for setup/teardown code
+
+### Safe Utility Functions (non-hot-path)
+| Function | Use Case | Safe? |
+|----------|----------|-------|
+| `save_rng_state()` / `restore_rng_state()` | Checkpoint save/restore | ✅ Yes |
+| `set_seed()` | Training startup | ✅ Yes |
+| `flush_cache()` | OOM recovery | ✅ Yes |
+| `synchronize()` | Profiling | ✅ Yes |
+| `memory_allocated_gb()` | Debug logging | ✅ Yes |
+
+### Unsafe in Hot Paths (avoid in training loops)
+| Function | Regression | Reason |
+|----------|-----------|--------|
+| `get_autocast_context()` | +0.35s/it | Python function call per forward pass |
+| `is_mps_device()` | N/A (skipped) | Simple wrapper, no value over inline check |
+| `is_cpu_device()` | N/A (skipped) | Simple wrapper, no value over inline check |
+| `is_mps_available()` | N/A (skipped) | Simple wrapper, no value over inline check |
+
 After each change ask the user to run a test consisting of 3 epochs.
 Each epoch consists of
 - 30 training steps 
