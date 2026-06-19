@@ -44,6 +44,18 @@ def is_mps_device(device) -> bool:
     return get_device_type(device) == 'mps'
 
 
+def is_cpu_device(device) -> bool:
+    """Check if a device is CPU."""
+    return get_device_type(device) == 'cpu'
+
+
+def memory_allocated_gb() -> float:
+    """Get memory allocated in GB for CUDA, 0.0 for other devices."""
+    if torch.cuda.is_available():
+        return torch.cuda.memory_allocated() / 1e9
+    return 0.0
+
+
 def save_rng_state() -> dict:
     """Save CPU and CUDA RNG states."""
     return {

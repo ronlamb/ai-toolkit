@@ -334,19 +334,145 @@ else:
 
 ---
 
+### Pattern 13: Tensor `.is_cuda` Attribute Check
+
+**Location:** `extensions_built_in/diffusion_models/chroma/src/math.py`
+
+**Occurrences:** 1 (line 17)
+
+**Pattern:**
+```python
+if _HAS_FLASH and mask is None and q.is_cuda:
+```
+
+**Recommendation:** Replace `q.is_cuda` with `is_cuda_device(q.device)` from `torch_util.py`. Note: this is in a third-party `src/` directory — consider whether to modify or leave as-is.
+
+---
+
+### Pattern 14: MPS Availability in Pipeline Code
+
+**Pattern:** `torch.backends.mps.is_available()`
+
+**Total occurrences:** 3
+
+**Modules:**
+| Module | Count | Lines |
+|--------|-------|-------|
+| `extensions_built_in/diffusion_models/chroma/pipeline.py` | 1 | 305 |
+| `extensions_built_in/diffusion_models/hidream/src/pipelines/hidream_image/pipeline_hidream_image.py` | 1 | 701 |
+| `extensions_built_in/diffusion_models/hidream/src/pipelines/hidream_image/pipeline_hidream_image_editing.py` | 1 | 1169 |
+
+**Proposed utility function:**
+```python
+def is_mps_available() -> bool:
+    return torch.backends.mps.is_available()
+```
+
+**NOTE:** Already exists in `torch_util.py` as `is_mps_available()`.
+
+---
+
+### Pattern 15: CPU Device Equality Check
+
+**Pattern:** `device == torch.device("cpu")`
+
+**Total occurrences:** 10+
+
+**Modules:**
+| Module | Count | Lines |
+|--------|-------|-------|
+| `extensions_built_in/diffusion_models/flux2/flux2_model.py` | 3 | 412, 529, 546 |
+| `extensions_built_in/diffusion_models/ernie_image/ernie_image.py` | 4 | 211, 241, 269, 296, 317 |
+| `extensions_built_in/diffusion_models/z_image/z_image.py` | 2 | 303, 329 |
+| `extensions_built_in/diffusion_models/hidream/hidream_o1_model.py` | 2 | 272, 283, 302, 335 |
+
+**Proposed utility function:**
+```python
+def is_cpu_device(device) -> bool:
+    return get_device_type(device) == 'cpu'
+```
+
+---
+
+### Pattern 16: MPS Dtype Fallback for Float64/Int64
+
+**Location:** `extensions_built_in/diffusion_models/hidream/src/models/transformers/transformer_hidream_image.py`
+
+**Occurrences:** 2 (lines 310-314)
+
+**Pattern:**
+```python
+is_mps = device.type == "mps"
+if is_mps:
+    dtype = torch.float32 if is_mps else torch.float64
+# ...
+    dtype = torch.int32 if is_mps else torch.int64
+```
+
+**Recommendation:** Use `is_mps_device(device)` from `torch_util.py` instead of `device.type == "mps"`. The float64/int64 fallback is MPS-specific and may need a dedicated helper if used elsewhere.
+
+---
+
+### Pattern 17: CUDA Memory Allocated Without Guards
+
+**Location:** `extensions_built_in/diffusion_models/hidream/src/hidream_o1/qwen3_vl_transformers.py`
+
+**Occurrences:** 4 (lines 1065, 1088, 1804, 1846)
+
+**Pattern:**
+```python
+_a = torch.cuda.memory_allocated() / 1e9
+```
+
+**Risk:** Will crash on MPS. These appear to be debug/memory logging statements.
+
+**Proposed utility function:**
+```python
+def memory_allocated_gb() -> float:
+    """Get memory allocated in GB for CUDA, 0.0 for other devices."""
+    if torch.cuda.is_available():
+        return torch.cuda.memory_allocated() / 1e9
+    return 0.0
+```
+
+---
+
+### Pattern 18: Autocast with Device Type as First Argument
+
+**Location:** `extensions_built_in/diffusion_models/hidream/src/hidream_o1/pipeline.py`
+
+**Occurrences:** 1 (line 396)
+
+**Pattern:**
+```python
+with torch.autocast(device.type, dtype=dtype):
+```
+
+**Risk:** `torch.autocast('mps', ...)` is not supported in all PyTorch versions. This will fail on MPS.
+
+**Recommendation:** Use `get_autocast_context(device, dtype=dtype)` from `torch_util.py` which returns `nullcontext()` for non-CUDA devices.
+
+---
+
 ## Summary
 
-| # | Pattern | Modules | Total Calls | Utility Function |
-|---|---------|---------|-------------|-----------------|
-| 1 | `torch.cuda.is_available()` | 14 | 27+ | `is_cuda_available()` |
-| 2 | `device.type == "mps"` | 5 | 8 | `is_mps_device()` |
-| 3 | RNG state save/restore | 4 | 5 | `save_rng_state()` / `restore_rng_state()` |
-| 4 | CUDA seed after CPU seed | 5 | 6+ | `set_seed()` |
-| 5 | Autocast context check | 2 | 3 | `get_autocast_context()` |
-| 6 | Default device selection | 6 | 10+ | `get_default_device()` |
-| 7 | MPS dtype fallback | 1 | 1 | `get_text_dtype()` |
-| 8 | CUDA device type check | 2 | 7 | `is_cuda_device()` |
-| 9 | MPS float safety | 2 | 2 | `mps_safe_float()` |
-| 10 | CUDA/MPS synchronize | 1 | 1 | `synchronize()` |
-| 11 | CUDA IPC collect | 1 | 1 | `flush_cuda_ipc()` |
-| 12 | MPS latent IDs (intra-module) | 1 | 2 | Move into `prepare_latent_image_ids()` |
+| # | Pattern | Modules | Total Calls | Utility Function | Status |
+|---|---------|---------|-------------|-----------------|--------|
+| 1 | `torch.cuda.is_available()` | 14 | 27+ | `is_cuda_available()` | ✅ In torch_util |
+| 2 | `device.type == "mps"` | 5 | 8 | `is_mps_device()` | ✅ In torch_util |
+| 3 | RNG state save/restore | 4 | 5 | `save_rng_state()` / `restore_rng_state()` | ✅ In torch_util |
+| 4 | CUDA seed after CPU seed | 5 | 6+ | `set_seed()` | ✅ In torch_util |
+| 5 | Autocast context check | 2 | 3 | `get_autocast_context()` | ✅ In torch_util |
+| 6 | Default device selection | 6 | 10+ | `get_default_device()` | ✅ In torch_util |
+| 7 | MPS dtype fallback (text) | 1 | 1 | `get_text_dtype()` | ✅ In torch_util |
+| 8 | CUDA device type check | 2 | 7 | `is_cuda_device()` | ✅ In torch_util |
+| 9 | MPS float safety | 2 | 2 | `mps_safe_float()` | ✅ In torch_util |
+| 10 | CUDA/MPS synchronize | 1 | 1 | `synchronize()` | ✅ In torch_util |
+| 11 | CUDA IPC collect | 1 | 1 | `flush_cuda_ipc()` | ✅ In torch_util |
+| 12 | MPS latent IDs (intra-module) | 1 | 2 | Move into `prepare_latent_image_ids()` | ⏳ Needs refactor |
+| 13 | Tensor `.is_cuda` attribute | 1 | 1 | Use `is_cuda_device()` | ⏳ Needs update |
+| 14 | `torch.backends.mps.is_available()` | 3 | 3 | `is_mps_available()` | ✅ In torch_util |
+| 15 | CPU device equality check | 4 | 10+ | `is_cpu_device()` | ❌ Missing |
+| 16 | MPS float64/int64 fallback | 1 | 2 | Use `is_mps_device()` | ⏳ Needs update |
+| 17 | CUDA memory allocated (unguarded) | 1 | 4 | `memory_allocated_gb()` | ❌ Missing |
+| 18 | Autocast with device.type arg | 1 | 1 | Use `get_autocast_context()` | ⏳ Needs update |
