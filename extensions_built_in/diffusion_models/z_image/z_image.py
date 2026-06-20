@@ -55,6 +55,8 @@ class ZImageModel(BaseModel):
         self.is_flow_matching = True
         self.is_transformer = True
         self.target_lora_modules = ["ZImageTransformer2DModel"]
+        # Cache for generation pipeline to avoid recreation (MPS optimization)
+        self._cached_pipeline = None
 
     # static method to get the noise scheduler
     @staticmethod
@@ -277,6 +279,10 @@ class ZImageModel(BaseModel):
         self.print_and_status_update("Model Loaded")
 
     def get_generation_pipeline(self):
+        # Return cached pipeline if available (MPS optimization)
+        if self._cached_pipeline is not None:
+            return self._cached_pipeline
+
         scheduler = ZImageModel.get_train_scheduler()
 
         pipeline: ZImagePipeline = ZImagePipeline(
@@ -288,6 +294,9 @@ class ZImageModel(BaseModel):
         )
 
         pipeline = pipeline.to(self.device_torch)
+
+        # Cache the pipeline for reuse
+        self._cached_pipeline = pipeline
 
         return pipeline
 
@@ -326,6 +335,7 @@ class ZImageModel(BaseModel):
         text_embeddings: PromptEmbeds,
         **kwargs,
     ):
+        # Move model to device if on CPU (low_vram mode)
         if self.model.device == torch.device("cpu"):
             self.model.to(self.device_torch)
 
@@ -340,7 +350,8 @@ class ZImageModel(BaseModel):
             text_embeddings.text_embeds,
         )[0]
 
-        noise_pred = torch.stack([t.float() for t in model_out_list], dim=0)
+        # Optimize: stack first, then convert dtype once (MPS optimization)
+        noise_pred = torch.stack(model_out_list, dim=0).float()
 
         noise_pred = noise_pred.squeeze(2)
         noise_pred = -noise_pred

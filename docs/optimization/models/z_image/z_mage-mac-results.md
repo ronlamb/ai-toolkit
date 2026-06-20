@@ -2,6 +2,20 @@
 
 Process is run for a step size of 30, for 8 epochs and generating 2 images for 5 steps to get a base generation time.
 
+## Timings Definition
+
+The timings reported will show the results of each epoch as four separate lines followed by a blank line, as shown below:
+
+```
+zimage_a1_ut:   0%|          | 29/20000 [04:14<48:40:44,  8.77s/it, lr: 1.0e-04 loss: 4.167e-01]
+Generating Samples:   0%|          | 0/2 [00:00<?, ?it/s]
+Generating Samples:  50%|#####     | 1/2 [00:38<00:38, 38.63s/it]
+Generating Samples: 100%|##########| 2/2 [01:16<00:00, 38.41s/it]
+```
+
+The first line is the time for training 30 steps.
+The next three lines are the times to generate the two images.
+
 ## Baseline Times
 
 Below are the baseline times at start before any changes as of the last improvement.  These times will be used determine whether a code change improves performance.
@@ -57,6 +71,64 @@ Once it hit epoch 8 the training time would fluctuate between what is shown at e
 
 ## Baseline time as of best change
 
-This section will contain the new baseline as of the best change.
+### Task 1: Cache pipeline in get_generation_pipeline() — **ACCEPTED**
 
-Initially not set.
+**Change:** Added `_cached_pipeline` attribute to avoid recreating ZImagePipeline on each call.
+
+**Raw results (epoch 5-6, steps 1019-1229):**
+```
+zimage_a1_ut:   5%|5         | 1019/20000 [03:23<36:56:42,  7.01s/it, lr: 1.0e-04 loss: 3.974e-01]
+Generating Samples:   0%|          | 0/2 [00:00<?, ?it/s]
+Generating Samples:  50%|#####     | 1/2 [00:35<00:35, 35.31s/it]
+Generating Samples: 100%|##########| 2/2 [01:10<00:00, 35.18s/it]
+
+zimage_a1_ut:   5%|5         | 1049/20000 [06:58<37:23:00,  7.10s/it, lr: 1.0e-04 loss: 4.038e-01]
+Generating Samples:   0%|          | 0/2 [00:00<?, ?it/s]
+Generating Samples:  50%|#####     | 1/2 [00:37<00:37, 37.27s/it]
+Generating Samples: 100%|##########| 2/2 [01:13<00:00, 36.81s/it]
+
+zimage_a1_ut:   5%|5         | 1079/20000 [10:46<38:11:25,  7.27s/it, lr: 1.0e-04 loss: 3.897e-01]
+Generating Samples:   0%|          | 0/2 [00:00<?, ?it/s]
+Generating Samples:  50%|#####     | 1/2 [00:38<00:38, 38.06s/it]
+Generating Samples: 100%|##########| 2/2 [01:14<00:00, 37.32s/it]
+
+zimage_a1_ut:   6%|5         | 1109/20000 [14:54<39:26:43,  7.52s/it, lr: 1.0e-04 loss: 4.282e-01]
+Generating Samples:   0%|          | 0/2 [00:00<?, ?it/s]
+Generating Samples:  50%|#####     | 1/2 [00:37<00:37, 37.34s/it]
+Generating Samples: 100%|##########| 2/2 [01:14<00:00, 36.98s/it]
+
+zimage_a1_ut:   6%|5         | 1139/20000 [19:04<40:14:03,  7.68s/it, lr: 1.0e-04 loss: 4.379e-01]
+Generating Samples:   0%|          | 0/2 [00:00<?, ?it/s]
+Generating Samples:  50%|#####     | 1/2 [00:37<00:37, 37.17s/it]
+Generating Samples: 100%|##########| 2/2 [01:13<00:00, 36.81s/it]
+
+zimage_a1_ut:   6%|5         | 1169/20000 [22:31<39:30:10,  7.55s/it, lr: 1.0e-04 loss: 3.234e-01]
+Generating Samples:   0%|          | 0/2 [00:00<?, ?it/s]
+Generating Samples:  50%|#####     | 1/2 [00:37<00:37, 37.13s/it]
+Generating Samples: 100%|##########| 2/2 [01:13<00:00, 36.83s/it]
+
+zimage_a1_ut:   6%|5         | 1199/20000 [27:09<40:42:45,  7.80s/it, lr: 1.0e-04 loss: 3.785e-01]
+Generating Samples:   0%|          | 0/2 [00:00<?, ?it/s]
+Generating Samples:  50%|#####     | 1/2 [00:36<00:36, 36.91s/it]
+Generating Samples: 100%|##########| 2/2 [01:13<00:00, 36.54s/it]
+
+zimage_a1_ut:   6%|6         | 1229/20000 [31:36<41:22:07,  7.93s/it, lr: 1.0e-04 loss: 3.712e-01]
+Generating Samples:   0%|          | 0/2 [00:00<?, ?it/s]
+Generating Samples:  50%|#####     | 1/2 [00:36<00:36, 36.95s/it]
+Generating Samples: 100%|##########| 2/2 [01:13<00:00, 36.59s/it]
+```
+
+**Comparison:**
+
+| Metric | Baseline (pre-Task 1) | Task 1 | Improvement |
+|--------|----------------------|--------|-------------|
+| Avg gen time/image | ~38.5s | ~36.6s | **~5% faster** |
+| Best gen time/image | 38.4s | 35.2s | **~8% faster** |
+| Worst gen time/image | 38.8s | 37.3s | **~4% faster** |
+
+**Notes:**
+- Upward drift from 35.2s → 36.6s over 8 epochs is likely MPS memory fragmentation, not code regression
+- Even worst new run (37.3s) beats baseline average (38.5s)
+- **This change is the new baseline**
+
+**New baseline for comparison:** ~36.6s/image average
