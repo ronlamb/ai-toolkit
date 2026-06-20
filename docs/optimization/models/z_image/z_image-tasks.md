@@ -89,7 +89,7 @@ This file contains the optimization tasks we will work on one by one, ordered by
 |------|--------|-------------|------------|-------------|-------|
 | 1    | Pending|             |            |             |       |
 | 2    | Pending|             |            |             |       |
-| 3    | Pending|             |            |             |       |
+| 3    | Reverted|             |            |             | No measurable improvement (training 7.48→7.58s, gen 36.3→36.71s) |
 | 4    | Pending|             |            |             |       |
 | 5    | Pending|             |            |             |       |
 | 6    | Pending|             |            |             |       |
