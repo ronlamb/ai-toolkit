@@ -1,6 +1,6 @@
 # Plan Task 2.
 
-Please analyze the Z-Image base code, following the instrucitons in #file:z_image-mac-instructions.md 
+Please analyze the Z-Image base code, following the instructions in #file:z_image-mac-instructions.md 
 
 Your next change is to run task 2, and only task 2.
 

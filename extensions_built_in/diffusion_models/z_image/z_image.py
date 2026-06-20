@@ -339,8 +339,8 @@ class ZImageModel(BaseModel):
         if self.model.device == torch.device("cpu"):
             self.model.to(self.device_torch)
 
-        latent_model_input = latent_model_input.unsqueeze(2)
-        latent_model_input_list = list(latent_model_input.unbind(dim=0))
+        # MPS optimization: build list of views directly, avoiding intermediate 5D tensor
+        latent_model_input_list = [x.unsqueeze(1) for x in latent_model_input]
 
         timestep_model_input = (1000 - timestep) / 1000
 

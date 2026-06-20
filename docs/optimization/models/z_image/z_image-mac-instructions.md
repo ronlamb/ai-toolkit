@@ -43,9 +43,26 @@ When working with MPS (Apple Silicon) performance in the AI Toolkit codebase, fo
 1. Create a test to measure performance **before** making the change
 2. Apply the fix
 3. Run the same test to verify improvement
-4. Update `/memories/session/mps_improvements_plan.md` with results
+4. Update `z_mage-mac-results.md` with results
 
-### Test Pattern for Each Change (see above)
+### Test Pattern for Each Change
+
+Run for 8 epochs × 30 steps, generating 2 images per epoch. Record **both** metrics:
+
+- **Training speed**: `s/it` from the progress bar (e.g., `7.24s/it`) — measures how fast each training step completes
+- **Generation speed**: `s/it` from the "Generating Samples" bar (e.g., `35.50s/it`) — measures time per generated image
+
+Both metrics matter:
+- Training speed improvements compound over thousands of steps
+- Generation speed is the user-facing experience
+- An optimization may improve one without improving the other
+
+When recording results in `z_mage-mac-results.md`, always include a comparison table with both metrics:
+
+| Metric | Baseline | After | Improvement |
+|--------|----------|-------|-------------|
+| Avg training s/it | X.XXs | X.XXs | X% |
+| Avg gen time/image | XX.Xs | XX.Xs | X% |
 
 ## MPS Optimization Status
 

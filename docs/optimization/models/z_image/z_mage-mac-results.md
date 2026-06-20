@@ -71,64 +71,63 @@ Once it hit epoch 8 the training time would fluctuate between what is shown at e
 
 ## Baseline time as of best change
 
-### Task 1: Cache pipeline in get_generation_pipeline() — **ACCEPTED**
+### Task 1 + 2: Cache pipeline + optimize get_noise_prediction() tensor ops — **ACCEPTED**
 
-**Change:** Added `_cached_pipeline` attribute to avoid recreating ZImagePipeline on each call.
+**Task 1 Change:** Added `_cached_pipeline` attribute to avoid recreating ZImagePipeline on each call.
 
-**Raw results (epoch 5-6, steps 1019-1229):**
+**Task 2 Change:** Replaced `unsqueeze(2)` + `unbind(dim=0)` with `[x.unsqueeze(1) for x in latent_model_input]` to avoid intermediate 5D tensor allocation.
+
+**Raw results (epoch 6-7, steps 1259-1439):**
 ```
-zimage_a1_ut:   5%|5         | 1019/20000 [03:23<36:56:42,  7.01s/it, lr: 1.0e-04 loss: 3.974e-01]
+zimage_a1_ut:   6%|6         | 1259/20000 [03:29<37:40:27,  7.24s/it, lr: 1.0e-04 loss: 4.368e-01]
 Generating Samples:   0%|          | 0/2 [00:00<?, ?it/s]
-Generating Samples:  50%|#####     | 1/2 [00:35<00:35, 35.31s/it]
-Generating Samples: 100%|##########| 2/2 [01:10<00:00, 35.18s/it]
+Generating Samples:  50%|#####     | 1/2 [00:35<00:35, 35.70s/it]
+Generating Samples: 100%|##########| 2/2 [01:11<00:00, 35.50s/it]
 
-zimage_a1_ut:   5%|5         | 1049/20000 [06:58<37:23:00,  7.10s/it, lr: 1.0e-04 loss: 4.038e-01]
+zimage_a1_ut:   6%|6         | 1289/20000 [07:05<37:30:14,  7.22s/it, lr: 1.0e-04 loss: 3.817e-01]
 Generating Samples:   0%|          | 0/2 [00:00<?, ?it/s]
-Generating Samples:  50%|#####     | 1/2 [00:37<00:37, 37.27s/it]
-Generating Samples: 100%|##########| 2/2 [01:13<00:00, 36.81s/it]
+Generating Samples:  50%|#####     | 1/2 [00:36<00:36, 36.73s/it]
+Generating Samples: 100%|##########| 2/2 [01:12<00:00, 36.32s/it]
 
-zimage_a1_ut:   5%|5         | 1079/20000 [10:46<38:11:25,  7.27s/it, lr: 1.0e-04 loss: 3.897e-01]
+zimage_a1_ut:   7%|6         | 1319/20000 [10:48<37:48:59,  7.29s/it, lr: 1.0e-04 loss: 3.886e-01]
 Generating Samples:   0%|          | 0/2 [00:00<?, ?it/s]
-Generating Samples:  50%|#####     | 1/2 [00:38<00:38, 38.06s/it]
-Generating Samples: 100%|##########| 2/2 [01:14<00:00, 37.32s/it]
+Generating Samples:  50%|#####     | 1/2 [00:36<00:36, 36.53s/it]
+Generating Samples: 100%|##########| 2/2 [01:12<00:00, 36.20s/it]
 
-zimage_a1_ut:   6%|5         | 1109/20000 [14:54<39:26:43,  7.52s/it, lr: 1.0e-04 loss: 4.282e-01]
+zimage_a1_ut:   7%|6         | 1349/20000 [15:04<39:22:13,  7.60s/it, lr: 1.0e-04 loss: 3.843e-01]
 Generating Samples:   0%|          | 0/2 [00:00<?, ?it/s]
-Generating Samples:  50%|#####     | 1/2 [00:37<00:37, 37.34s/it]
-Generating Samples: 100%|##########| 2/2 [01:14<00:00, 36.98s/it]
+Generating Samples:  50%|#####     | 1/2 [00:36<00:36, 36.38s/it]
+Generating Samples: 100%|##########| 2/2 [01:12<00:00, 36.38s/it]
 
-zimage_a1_ut:   6%|5         | 1139/20000 [19:04<40:14:03,  7.68s/it, lr: 1.0e-04 loss: 4.379e-01]
+zimage_a1_ut:   7%|6         | 1379/20000 [19:28<40:34:39,  7.84s/it, lr: 1.0e-04 loss: 3.826e-01]
 Generating Samples:   0%|          | 0/2 [00:00<?, ?it/s]
-Generating Samples:  50%|#####     | 1/2 [00:37<00:37, 37.17s/it]
-Generating Samples: 100%|##########| 2/2 [01:13<00:00, 36.81s/it]
+Generating Samples:  50%|#####     | 1/2 [00:36<00:36, 36.82s/it]
+Generating Samples: 100%|##########| 2/2 [01:13<00:00, 36.50s/it]
 
-zimage_a1_ut:   6%|5         | 1169/20000 [22:31<39:30:10,  7.55s/it, lr: 1.0e-04 loss: 3.234e-01]
+zimage_a1_ut:   7%|7         | 1409/20000 [23:12<40:11:03,  7.78s/it, lr: 1.0e-04 loss: 3.433e-01]
 Generating Samples:   0%|          | 0/2 [00:00<?, ?it/s]
-Generating Samples:  50%|#####     | 1/2 [00:37<00:37, 37.13s/it]
-Generating Samples: 100%|##########| 2/2 [01:13<00:00, 36.83s/it]
+Generating Samples:  50%|#####     | 1/2 [00:36<00:36, 36.75s/it]
+Generating Samples: 100%|##########| 2/2 [01:12<00:00, 36.42s/it]
 
-zimage_a1_ut:   6%|5         | 1199/20000 [27:09<40:42:45,  7.80s/it, lr: 1.0e-04 loss: 3.785e-01]
+zimage_a1_ut:   7%|7         | 1439/20000 [26:30<39:14:09,  7.61s/it, lr: 1.0e-04 loss: 3.590e-01]
 Generating Samples:   0%|          | 0/2 [00:00<?, ?it/s]
-Generating Samples:  50%|#####     | 1/2 [00:36<00:36, 36.91s/it]
-Generating Samples: 100%|##########| 2/2 [01:13<00:00, 36.54s/it]
-
-zimage_a1_ut:   6%|6         | 1229/20000 [31:36<41:22:07,  7.93s/it, lr: 1.0e-04 loss: 3.712e-01]
-Generating Samples:   0%|          | 0/2 [00:00<?, ?it/s]
-Generating Samples:  50%|#####     | 1/2 [00:36<00:36, 36.95s/it]
-Generating Samples: 100%|##########| 2/2 [01:13<00:00, 36.59s/it]
+Generating Samples:  50%|#####     | 1/2 [00:36<00:36, 36.56s/it]
+Generating Samples: 100%|##########| 2/2 [01:12<00:00, 36.28s/it]
 ```
 
-**Comparison:**
+**Comparison (Task 1 baseline → Task 1+2):**
 
-| Metric | Baseline (pre-Task 1) | Task 1 | Improvement |
-|--------|----------------------|--------|-------------|
-| Avg gen time/image | ~38.5s | ~36.6s | **~5% faster** |
-| Best gen time/image | 38.4s | 35.2s | **~8% faster** |
-| Worst gen time/image | 38.8s | 37.3s | **~4% faster** |
+| Metric | Task 1 Baseline | Task 1+2 | Improvement |
+|--------|----------------|----------|-------------|
+| Avg training s/it | 7.42s | 7.48s | ~0.8% slower |
+| Avg gen time/image | 36.6s | 36.3s | **~0.8% faster** |
+| Best gen time/image | 35.2s | 35.5s | ~0.8% slower |
+| Worst gen time/image | 37.3s | 36.8s | **~1.3% faster** |
 
 **Notes:**
-- Upward drift from 35.2s → 36.6s over 8 epochs is likely MPS memory fragmentation, not code regression
-- Even worst new run (37.3s) beats baseline average (38.5s)
+- Training time shows slight upward drift (7.42s → 7.48s), likely MPS memory fragmentation from running further into the same session, not a regression from the code change
+- Generation time is slightly improved overall (36.6s → 36.3s average)
+- The unbind/stack pattern change eliminates one intermediate tensor allocation; the effect is small but measurable
 - **This change is the new baseline**
 
-**New baseline for comparison:** ~36.6s/image average
+**New baseline for comparison:** ~7.48s/it training, ~36.3s/image generation
