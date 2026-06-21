@@ -90,11 +90,11 @@ This file contains the optimization tasks we will work on one by one, ordered by
 | 1    | Pending|             |            |             |       |
 | 2    | Pending|             |            |             |       |
 | 3    | Reverted|             |            |             | No measurable improvement (training 7.48→7.58s, gen 36.3→36.71s) |
-| 4    | Pending|             |            |             |       |
-| 5    | Pending|             |            |             |       |
-| 6    | Pending|             |            |             |       |
-| 7    | Pending|             |            |             |       |
-| 8    | Pending|             |            |             |       |
+| 4    | Reverted|             |            |             | Regression (training 7.48→8.31s, gen 36.3→37.11s) |
+| 5    | Reverted|             |            |             | Regression (training 7.48→8.00s, gen 36.3→37.72s) |
+| 6    | Reverted|             |            |             | Training regression 7.48→9.35s, gen improved 36.3→34.6s (cache grows unbounded) |
+| 7    | Reverted|             |            |             | Regression (training 7.48→7.74s, gen 36.3→36.22s flat) |
+| 8    | Reverted|             |            |             | Regression (training 7.48→8.18s, gen 36.3→37.02s) |
 
 ## Test Procedure
 For each task:

@@ -1,71 +1,84 @@
-# CoPilot Instructions
+# Z-Image MPS Optimization — Round 2 Instructions
 
-## MPS (Apple Silicon) Optimization Guidelines for Z-Image
+## Key Lessons from Round 1
 
-When working with MPS (Apple Silicon) performance in the AI Toolkit codebase, follow these guidelines:
+**What worked (eliminated redundant work):**
+- Task 1: Pipeline caching — avoided recreating ZImagePipeline objects
+- Task 2: Tensor op optimization — avoided intermediate 5D tensor + batched dtype conversion
 
-### Code Categorization for MPS Optimization
+**What failed (device-state caching adds overhead on MPS):**
+- Device flags (Tasks 3, 4): Flag checks cost more than `.device` property access
+- Tensor caching (Task 5): Cache invalidation checks cost more than `.to()` on MPS
+- Prompt caching (Task 6): Unbounded cache grew with unique training prompts
+- VAE pre-positioning (Task 7): VAE already on device; check was cheap
+- Memory flush (Task 8): `gc.collect()` is expensive per-call
 
-#### 1. Main Pipeline Code
-- `toolkit/stable_diffusion_model.py` - `generate_images()` method (line ~1200)
-- `jobs/process/GenerateProcess.py` - Main generation orchestration
-- `toolkit/models/base_model.py` - Base model class with pipeline management
+**Rule for Round 2:** Focus on **eliminating computation or allocations**, not caching device state.
 
-#### 2. General Image Creation Code
-- `toolkit/sampler.py` - Sampler utilities
-- `toolkit/pipelines.py` - Custom pipeline implementations
+## Code Files
 
-### 3. Zimage Specific Code
-- `extensions_built_in/diffusion_models/chroma/` - Chroma model family
-  - `z_image.py` - Main Chroma model class
+| File | Hot Path | Called |
+|------|----------|--------|
+| `extensions_built_in/diffusion_models/z_image/z_image.py` | `get_noise_prediction()`, `generate_single_image()` | Every training step / per image |
+| `toolkit/samplers/custom_flowmatch_sampler.py` | `get_weights_for_timesteps()`, `get_sigmas()`, `_get_step_indices()` | Every training step / denoising step |
+| `toolkit/models/base_model.py` | Training loop, `encode_images()`, `decode_latents()` | Every epoch / per image |
 
-### Development Tools Guidelines
+## New Task Options
 
-**IMPORTANT**: Always use editor tools (read_file, edit_notebook_file, replace_string_in_file, etc.) to view and modify files directly. Do NOT use terminal commands like grep, sed, cat, or find to examine or edit files.
+### Option A: Pre-compute timestep normalization in `get_noise_prediction()`
+**File:** `z_image.py`
+**Idea:** `(1000 - timestep) / 1000` is computed every call. If timestep values are reused (e.g., same schedule), pre-normalize once.
+**Risk:** Low — arithmetic only, no state caching.
 
-### MPS Performance Issues to Watch For
+### Option B: Fuse squeeze + negate in `get_noise_prediction()`
+**File:** `z_image.py`
+**Idea:** `noise_pred = noise_pred.squeeze(2)` then `noise_pred = -noise_pred` creates two temporaries. Try `noise_pred = -noise_pred.squeeze(2)` or `torch.neg()` in-place.
+**Risk:** Very low — single-line change.
 
-1. **Excessive CPU↔GPU Transfers** - Tensors bouncing between CPU and GPU
-2. **Timesteps Weights Not Cached** - No device change detection for weights
-3. **Latent Image IDs Created on Wrong Device** - CPU then moved to device
-4. **VAE Device Mismatch Risk** - VAE on different device than latents
-5. **No Pipeline Caching** - Pipeline recreated unnecessarily
-6. **Pipeline Not Moved to Device** - `pipeline.to(device)` not called in get_generation_pipeline()
+### Option C: Optimize `_get_step_indices()` device/dtype conversion
+**File:** `custom_flowmatch_sampler.py`
+**Idea:** `timesteps.to(device=base.device, dtype=base.dtype)` is called every invocation by both `get_weights_for_timesteps()` and `get_sigmas()`. If timesteps are already on the right device/dtype, skip the `.to()`.
+**Risk:** Low — conditional check, no persistent state.
 
-### Implementation Order (Inner to Outer)
+### Option D: Eliminate redundant `unsqueeze` in denoising loop
+**File:** `custom_flowmatch_sampler.py` — `get_sigmas()`
+**Idea:** `while len(sigmas.shape) < n_dim: sigmas = sigmas.unsqueeze(-1)` runs every call. Pre-compute target shape or use `view()` instead.
+**Risk:** Low — shape manipulation only.
 
-1. **Phase 1**: Core sampler optimizations (`custom_flowmatch_sampler.py`)
-2. **Phase 2**: Model-level optimizations (`base_model.py`, `z_image.py`)
-3. **Phase 3**: Pipeline-level optimizations (`pipeline.py`)
+### Option E: Move text encoder device check outside hot path
+**File:** `z_image.py` — `get_prompt_embeds()`
+**Idea:** The text encoder device check happens every prompt encoding. During training, prompts change per batch but the device doesn't. Move check to happen once per epoch or after device state changes.
+**Risk:** Medium — requires understanding when device changes occur.
 
-### For Each Change
+### Option F: Reduce Python overhead in training loop
+**File:** `toolkit/models/base_model.py`
+**Idea:** The training loop has many Python-level checks per step (adapter state, control images, etc.). Profile to find the hottest Python code and minimize per-step work.
+**Risk:** Medium — requires profiling first.
 
-1. Create a test to measure performance **before** making the change
-2. Apply the fix
-3. Run the same test to verify improvement
-4. Update `z_mage-mac-results.md` with results
+## Test Protocol
 
-### Test Pattern for Each Change
-
-Run for 8 epochs × 30 steps, generating 2 images per epoch. Record **both** metrics:
-
-- **Training speed**: `s/it` from the progress bar (e.g., `7.24s/it`) — measures how fast each training step completes
-- **Generation speed**: `s/it` from the "Generating Samples" bar (e.g., `35.50s/it`) — measures time per generated image
-
-Both metrics matter:
-- Training speed improvements compound over thousands of steps
-- Generation speed is the user-facing experience
-- An optimization may improve one without improving the other
-
-When recording results in `z_mage-mac-results.md`, always include a comparison table with both metrics:
+Run for **8 epochs × 30 steps, generate 2 images per epoch**. Record both:
 
 | Metric | Baseline | After | Improvement |
 |--------|----------|-------|-------------|
-| Avg training s/it | X.XXs | X.XXs | X% |
-| Avg gen time/image | XX.Xs | XX.Xs | X% |
+| Avg training s/it | 7.48s | X.XXs | X% |
+| Avg gen time/image | 36.3s | XX.Xs | X% |
 
-## MPS Optimization Status
+**Accept if:** Both metrics improve or one improves significantly without the other regressing >2%.
+**Revert if:** Either metric regresses >2% with no compensating gain.
 
-See the following for the current status of all MPS optimizations:
-- [z_image-mac-results.md](z_image-mac-instructions.md) - Detailed test results for each change
-  - Update this as each change is completed.
+## Workflow
+
+1. Pick a task option (A–F) or propose a new one
+2. **Plan the change** — show the diff/snippet, get user approval
+3. **Implement** — apply the change (≤20 lines)
+4. **User tests** — run speed test
+5. **Record results** — update `z_mage-mac-results.md`
+6. **Next task** — continue sequentially
+
+## Constraints
+- Max **20 modified lines** per change
+- No rewrites; only surgical optimizations
+- Use `.venv` Python (`.venv/bin/python`)
+- Use `torch_util.py` helpers (`get_device_type()`, `is_mps_device()`, `flush()`, etc.)
+- **DO NOT commit or push** — user handles version control
