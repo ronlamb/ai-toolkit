@@ -113,25 +113,17 @@ class CustomFlowMatchEulerDiscreteScheduler(FlowMatchEulerDiscreteScheduler):
         return sample
 
     def _get_step_indices(self, timesteps: torch.Tensor) -> torch.Tensor:
-        base = self.timesteps
-
         # ensure same dtype/device
-        timesteps = timesteps.to(device=base.device, dtype=base.dtype)
+        timesteps = timesteps.to(device=self._timesteps_sorted.device, dtype=self._timesteps_sorted.dtype)
 
-        if base[0] > base[-1]:
-            base = torch.flip(base, dims=[0])
-            flipped = True
-        else:
-            flipped = False
-
-        if flipped:
+        if self._timesteps_flipped:
             t = torch.flip(timesteps, dims=[0])
         else:
             t = timesteps
 
-        idx = torch.searchsorted(base, t)
+        idx = torch.searchsorted(self._timesteps_sorted, t)
 
-        if flipped:
+        if self._timesteps_flipped:
             idx = (len(self.timesteps) - 1) - idx
 
         return idx
@@ -148,6 +140,9 @@ class CustomFlowMatchEulerDiscreteScheduler(FlowMatchEulerDiscreteScheduler):
         if timestep_type == 'linear' or timestep_type == 'weighted':
             timesteps = torch.linspace(1000, 1, num_timesteps, device=device)
             self.timesteps = timesteps
+            # MPS optimization: pre-compute sorted base and flipped flag
+            self._timesteps_sorted = torch.flip(self.timesteps, dims=[0])
+            self._timesteps_flipped = True
             
             return timesteps
         elif timestep_type == 'sigmoid':
@@ -162,6 +157,13 @@ class CustomFlowMatchEulerDiscreteScheduler(FlowMatchEulerDiscreteScheduler):
             timesteps, _ = torch.sort(timesteps, descending=True)
 
             self.timesteps = timesteps.to(device=device)
+            # MPS optimization: pre-compute sorted base and flipped flag
+            if self.timesteps[0] > self.timesteps[-1]:
+                self._timesteps_sorted = torch.flip(self.timesteps, dims=[0])
+                self._timesteps_flipped = True
+            else:
+                self._timesteps_sorted = self.timesteps
+                self._timesteps_flipped = False
 
             return timesteps
         elif timestep_type in ['flux_shift', 'lumina2_shift', 'shift']:
@@ -228,6 +230,13 @@ class CustomFlowMatchEulerDiscreteScheduler(FlowMatchEulerDiscreteScheduler):
 
             self.timesteps = timesteps
             self.sigmas = sigmas
+            # MPS optimization: pre-compute sorted base and flipped flag
+            if self.timesteps[0] > self.timesteps[-1]:
+                self._timesteps_sorted = torch.flip(self.timesteps, dims=[0])
+                self._timesteps_flipped = True
+            else:
+                self._timesteps_sorted = self.timesteps
+                self._timesteps_flipped = False
             return timesteps
 
         elif timestep_type == 'lognorm_blend':
@@ -252,6 +261,13 @@ class CustomFlowMatchEulerDiscreteScheduler(FlowMatchEulerDiscreteScheduler):
 
             timesteps = timesteps.to(torch.int)
             self.timesteps = timesteps.to(device=device)
+            # MPS optimization: pre-compute sorted base and flipped flag
+            if self.timesteps[0] > self.timesteps[-1]:
+                self._timesteps_sorted = torch.flip(self.timesteps, dims=[0])
+                self._timesteps_flipped = True
+            else:
+                self._timesteps_sorted = self.timesteps
+                self._timesteps_flipped = False
             return timesteps
         else:
             raise ValueError(f"Invalid timestep type: {timestep_type}")
