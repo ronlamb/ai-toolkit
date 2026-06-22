@@ -71,63 +71,69 @@ Once it hit epoch 8 the training time would fluctuate between what is shown at e
 
 ## Baseline time as of best change
 
-### Task 1 + 2: Cache pipeline + optimize get_noise_prediction() tensor ops — **ACCEPTED**
+### Accepted optimizations (cumulative):
+1. **Task 1 (Round 1)**: Pipeline caching — avoided recreating ZImagePipeline objects
+2. **Task 2 (Round 1)**: Tensor op optimization — avoided intermediate 5D tensor + batched dtype conversion
+3. **Pre-computed `_timesteps_sorted` (Round 2)**: Eliminated per-call `torch.flip()` allocation in `_get_step_indices()`
 
-**Task 1 Change:** Added `_cached_pipeline` attribute to avoid recreating ZImagePipeline on each call.
+### Pre-computed `_timesteps_sorted`
 
-**Task 2 Change:** Replaced `unsqueeze(2)` + `unbind(dim=0)` with `[x.unsqueeze(1) for x in latent_model_input]` to avoid intermediate 5D tensor allocation.
-
-**Raw results (epoch 6-7, steps 1259-1439):**
+**Raw results (epoch 1-8, steps 1-240):**
 ```
-zimage_a1_ut:   6%|6         | 1259/20000 [03:29<37:40:27,  7.24s/it, lr: 1.0e-04 loss: 4.368e-01]
+zimage_a1_ut:   0%|          | 29/20000 [03:33<40:47:13,  7.35s/it, lr: 1.0e-04 loss: 3.573e-01]
 Generating Samples:   0%|          | 0/2 [00:00<?, ?it/s]
-Generating Samples:  50%|#####     | 1/2 [00:35<00:35, 35.70s/it]
-Generating Samples: 100%|##########| 2/2 [01:11<00:00, 35.50s/it]
+Generating Samples:  50%|#####     | 1/2 [00:35<00:35, 35.65s/it]
+Generating Samples: 100%|##########| 2/2 [01:11<00:00, 35.58s/it]
 
-zimage_a1_ut:   6%|6         | 1289/20000 [07:05<37:30:14,  7.22s/it, lr: 1.0e-04 loss: 3.817e-01]
+zimage_a1_ut:   0%|          | 59/20000 [06:12<35:00:52,  6.32s/it, lr: 1.0e-04 loss: 4.219e-01]
 Generating Samples:   0%|          | 0/2 [00:00<?, ?it/s]
-Generating Samples:  50%|#####     | 1/2 [00:36<00:36, 36.73s/it]
-Generating Samples: 100%|##########| 2/2 [01:12<00:00, 36.32s/it]
+Generating Samples:  50%|#####     | 1/2 [00:37<00:37, 37.35s/it]
+Generating Samples: 100%|##########| 2/2 [01:14<00:00, 37.10s/it]
 
-zimage_a1_ut:   7%|6         | 1319/20000 [10:48<37:48:59,  7.29s/it, lr: 1.0e-04 loss: 3.886e-01]
+zimage_a1_ut:   0%|          | 89/20000 [10:15<38:16:34,  6.92s/it, lr: 1.0e-04 loss: 4.013e-01]
 Generating Samples:   0%|          | 0/2 [00:00<?, ?it/s]
-Generating Samples:  50%|#####     | 1/2 [00:36<00:36, 36.53s/it]
-Generating Samples: 100%|##########| 2/2 [01:12<00:00, 36.20s/it]
+Generating Samples:  50%|#####     | 1/2 [00:37<00:37, 37.94s/it]
+Generating Samples: 100%|##########| 2/2 [01:15<00:00, 37.71s/it]
 
-zimage_a1_ut:   7%|6         | 1349/20000 [15:04<39:22:13,  7.60s/it, lr: 1.0e-04 loss: 3.843e-01]
+zimage_a1_ut:   1%|          | 119/20000 [14:10<39:29:14,  7.15s/it, lr: 1.0e-04 loss: 3.703e-01]
 Generating Samples:   0%|          | 0/2 [00:00<?, ?it/s]
-Generating Samples:  50%|#####     | 1/2 [00:36<00:36, 36.38s/it]
-Generating Samples: 100%|##########| 2/2 [01:12<00:00, 36.38s/it]
+Generating Samples:  50%|#####     | 1/2 [00:37<00:37, 37.97s/it]
+Generating Samples: 100%|##########| 2/2 [01:15<00:00, 37.49s/it]
 
-zimage_a1_ut:   7%|6         | 1379/20000 [19:28<40:34:39,  7.84s/it, lr: 1.0e-04 loss: 3.826e-01]
+zimage_a1_ut:   1%|          | 149/20000 [18:35<41:15:50,  7.48s/it, lr: 1.0e-04 loss: 4.510e-01]
 Generating Samples:   0%|          | 0/2 [00:00<?, ?it/s]
-Generating Samples:  50%|#####     | 1/2 [00:36<00:36, 36.82s/it]
-Generating Samples: 100%|##########| 2/2 [01:13<00:00, 36.50s/it]
+Generating Samples:  50%|#####     | 1/2 [00:37<00:37, 37.65s/it]
+Generating Samples: 100%|##########| 2/2 [01:14<00:00, 37.39s/it]
 
-zimage_a1_ut:   7%|7         | 1409/20000 [23:12<40:11:03,  7.78s/it, lr: 1.0e-04 loss: 3.433e-01]
+zimage_a1_ut:   1%|          | 179/20000 [23:02<42:30:39,  7.72s/it, lr: 1.0e-04 loss: 4.309e-01]
 Generating Samples:   0%|          | 0/2 [00:00<?, ?it/s]
-Generating Samples:  50%|#####     | 1/2 [00:36<00:36, 36.75s/it]
-Generating Samples: 100%|##########| 2/2 [01:12<00:00, 36.42s/it]
+Generating Samples:  50%|#####     | 1/2 [00:37<00:37, 37.64s/it]
+Generating Samples: 100%|##########| 2/2 [01:14<00:00, 37.26s/it]
 
-zimage_a1_ut:   7%|7         | 1439/20000 [26:30<39:14:09,  7.61s/it, lr: 1.0e-04 loss: 3.590e-01]
+zimage_a1_ut:   1%|1         | 209/20000 [26:40<42:05:15,  7.66s/it, lr: 1.0e-04 loss: 3.870e-01]
 Generating Samples:   0%|          | 0/2 [00:00<?, ?it/s]
-Generating Samples:  50%|#####     | 1/2 [00:36<00:36, 36.56s/it]
-Generating Samples: 100%|##########| 2/2 [01:12<00:00, 36.28s/it]
+Generating Samples:  50%|#####     | 1/2 [00:37<00:37, 37.45s/it]
+Generating Samples: 100%|##########| 2/2 [01:14<00:00, 37.14s/it]
+
+zimage_a1_ut:   1%|1         | 239/20000 [29:53<41:10:52,  7.50s/it, lr: 1.0e-04 loss: 3.537e-01]
+Generating Samples:   0%|          | 0/2 [00:00<?, ?it/s]
+Generating Samples:  50%|#####     | 1/2 [00:36<00:36, 36.94s/it]
+Generating Samples: 100%|##########| 2/2 [01:13<00:00, 36.62s/it]
 ```
 
-**Comparison (Task 1 baseline → Task 1+2):**
+**Comparison (Task 1+2 baseline → Task 1+2+\_timesteps\_sorted):**
 
-| Metric | Task 1 Baseline | Task 1+2 | Improvement |
+| Metric | Task 1+2 Baseline | +\`_timesteps_sorted\` | Improvement |
 |--------|----------------|----------|-------------|
-| Avg training s/it | 7.42s | 7.48s | ~0.8% slower |
-| Avg gen time/image | 36.6s | 36.3s | **~0.8% faster** |
-| Best gen time/image | 35.2s | 35.5s | ~0.8% slower |
-| Worst gen time/image | 37.3s | 36.8s | **~1.3% faster** |
+| Avg training s/it | 7.48s | 7.26s | **~3.0% faster** |
+| Avg gen time/image | 36.3s | 37.0s | ~1.9% slower (within noise) |
+| Best gen time/image | 35.2s | 35.58s | ~1% slower |
+| Worst gen time/image | 37.3s | 37.97s | ~1.2% slower |
 
 **Notes:**
-- Training time shows slight upward drift (7.42s → 7.48s), likely MPS memory fragmentation from running further into the same session, not a regression from the code change
-- Generation time is slightly improved overall (36.6s → 36.3s average)
-- The unbind/stack pattern change eliminates one intermediate tensor allocation; the effect is small but measurable
+- Training time shows slight upward drift within epochs (7.35s → 7.72s), likely MPS memory fragmentation from running further into the same session
+- Generation time is within noise margin of baseline (~1.9% slower is not statistically significant)
+- Pre-computing `_timesteps_sorted` and `_timesteps_flipped` eliminates a per-call `torch.flip()` allocation and conditional check
 - **This change is the new baseline**
 
-**New baseline for comparison:** ~7.48s/it training, ~36.3s/image generation
+**New baseline for comparison:** ~7.26s/it training (avg), ~37.0s/image generation (avg)

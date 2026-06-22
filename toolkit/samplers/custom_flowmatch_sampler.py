@@ -93,7 +93,7 @@ class CustomFlowMatchEulerDiscreteScheduler(FlowMatchEulerDiscreteScheduler):
         sigmas = self.sigmas[step_indices].to(device=device, dtype=dtype)
 
         while len(sigmas.shape) < n_dim:
-            sigmas = sigmas.unsqueeze(-1)
+            sigmas = sigmas.unsqueeze(-1
 
         return sigmas        
 
