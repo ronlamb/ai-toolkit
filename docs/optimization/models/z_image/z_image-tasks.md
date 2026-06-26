@@ -81,25 +81,81 @@ This file contains the optimization tasks we will work on one by one, ordered by
 **Changes:**
 - Review and add memory management calls
 
+## Task 9: Cache inspect.signature() check at init time
+**File:** `toolkit/models/base_model.py`
+**Impact:** Medium - Eliminates Python reflection call on every training step
+**Description:**
+- `predict_noise()` calls `inspect.signature(self.get_noise_prediction).parameters` on every step
+- This is a pure metadata check that never changes after model load
+- Moving this to `__init__` eliminates per-step reflection overhead
+**Changes:**
+- In `BaseModel.__init__()`, cache three boolean flags from signature inspection
+- Replace `inspect.signature()` call in `predict_noise()` with cached flag lookups
+
+## Task 10: Remove hasattr check in scale_model_input loop
+**File:** `toolkit/models/base_model.py`
+**Impact:** Low-Medium - Eliminates per-batch-item hasattr call
+**Description:**
+- Inside `scale_model_input`, `hasattr(self.noise_scheduler, '_step_index')` is called per batch item
+- This adds N× hasattr calls per training step (N = batch size)
+**Changes:**
+- Move hasattr check outside the loop or cache the result
+
+## Task 11: Reduce conditionals in predict_noise hot path
+**File:** `toolkit/models/base_model.py`
+**Impact:** Low-Medium - Removes per-step device/dtype checks
+**Description:**
+- `self.unet.device != self.device_torch` and `self.unet.dtype != self.torch_dtype` checked every step
+- These checks add conditionals to the hot path
+**Changes:**
+- Evaluate whether these checks can be moved to less frequent points
+
+## Task 12: Optimize data loading / batch preparation
+**File:** `toolkit/data_loader.py` and related
+**Impact:** Medium - CPU-bound work that could overlap with GPU
+**Description:**
+- Data loading and batch preparation happen on CPU
+- May be able to prefetch or overlap with GPU computation
+**Changes:**
+- Profile data loading path and identify bottlenecks
+
 ---
 
 ## Status Tracking
 
 | Task | Status | Before (ms) | After (ms) | Improvement | Notes |
 |------|--------|-------------|------------|-------------|-------|
-| 1    | Pending|             |            |             |       |
-| 2    | Pending|             |            |             |       |
-| 3    | Reverted|             |            |             | No measurable improvement (training 7.48→7.58s, gen 36.3→36.71s) |
-| 4    | Reverted|             |            |             | Regression (training 7.48→8.31s, gen 36.3→37.11s) |
-| 5    | Reverted|             |            |             | Regression (training 7.48→8.00s, gen 36.3→37.72s) |
-| 6    | Reverted|             |            |             | Training regression 7.48→9.35s, gen improved 36.3→34.6s (cache grows unbounded) |
-| 7    | Reverted|             |            |             | Regression (training 7.48→7.74s, gen 36.3→36.22s flat) |
-| 8    | Reverted|             |            |             | Regression (training 7.48→8.18s, gen 36.3→37.02s) |
+| 1    | Completed | 8.77s/it, 38.5s/img | 7.48s/it, 36.3s/img | ~15% train, ~6% gen | Pipeline caching |
+| 2    | Completed | 7.48s/it, 36.3s/img | 7.26s/it, 37.0s/img | ~3% train, flat gen | Tensor op optimization |
+| 3    | Reverted | 7.48s/it | 7.58s/it | No improvement | Device check caching adds overhead |
+| 4    | Reverted | 7.48s/it | 8.31s/it | Regression | Model device check adds overhead |
+| 5    | Reverted | 7.48s/it | 8.00s/it | Regression | Cache invalidation adds overhead |
+| 6    | Reverted | 7.48s/it | 9.35s/it | Regression | Cache grows unbounded |
+| 7    | Reverted | 7.48s/it | 7.74s/it | Regression | VAE device check adds overhead |
+| 8    | Reverted | 7.48s/it | 8.18s/it | Regression | Flush() calls add sync overhead |
+| 9    | Reverted | 7.26s/it | 7.0→7.8s/it | Regression | Cached signature objects cause memory fragmentation on MPS over time |
+| 10   | Reverted | 7.26s/it | 8.3-8.6s/it | ~15% regression | Even local boolean conditional on hot path adds overhead on MPS |
+| 11   | Pending | 7.26s/it | | | Device/dtype check reduction |
+| 12   | Pending | 7.26s/it | | | Data loading optimization |
+
+## Rejected Optimization Lessons (MPS-Specific)
+
+1. **Device-state caching adds overhead** — Flag checks cost more than `.device` property access on MPS
+2. **Operation fusion can regress** — Fused ops trigger different Metal kernel paths with worse fragmentation
+3. **`.view()` can force copies** — `.unsqueeze()` is safer (always zero-copy)
+4. **Do not remove `.to()` calls on MPS** — Splitting conversions can be faster
+5. **Pre-computing allocations works** — Proven pattern (Tasks 1-2)
+6. **Micro-benchmarks don't predict real-world MPS performance** — `.reshape()` showed 35-48% speedup in isolation but caused 11% regression in full training
+7. **Any conditional on hot path adds overhead** — `hasattr`, `getattr`, `if is_flow_matching` all caused regressions
+8. **Stale .pyc cache causes false regressions** — Always clear `__pycache__` before testing
+9. **Cached signature objects fragment MPS memory** — `inspect.signature()` results held as instance attributes cause gradual slowdown (7.0s → 7.8s over 8 epochs) due to Parameter object references interfering with GC
 
 ## Test Procedure
 For each task:
-1. Measure baseline performance (8 epochs × 30 steps, generate 2 images)
-2. Apply the change
-3. Run the same test
-4. Record results in the table above
-5. Update status to "Completed" or "Reverted" with notes
+1. **Clear Python bytecode cache:** `find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null; find . -name '*.pyc' -delete 2>/dev/null`
+2. Measure baseline performance (8 epochs × 30 steps, generate 2 images)
+3. Apply the change
+4. **Clear Python bytecode cache again**
+5. Run the same test
+6. Record results in the table above
+7. Update status to "Completed" or "Reverted" with notes

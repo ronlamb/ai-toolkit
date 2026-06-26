@@ -48,9 +48,32 @@ When working with MPS (Apple Silicon) performance in the AI Toolkit codebase, fo
 ### For Each Change
 
 1. Create a test to measure performance **before** making the change
-2. Apply the fix
-3. Run the same test to verify improvement
-4. Update `/memories/session/mps_improvements_plan.md` with results
+2. **Clear Python bytecode cache** before running the test (see below)
+3. Apply the fix
+4. **Clear Python bytecode cache** again
+5. Run the same test to verify improvement
+6. Update `/memories/session/mps_improvements_plan.md` with results
+
+### Clear Python Bytecode Cache (REQUIRED Before Each Test)
+
+**Python caches compiled `.pyc` files in `__pycache__` directories. Stale cache from rejected/ reverted changes will cause old code to run, making optimizations appear to regress when they don't (or vice versa).**
+
+Before running any speed test, execute:
+
+```bash
+cd /Users/rlamb/src/ai-toolkit && find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null; find . -name '*.pyc' -delete 2>/dev/null
+```
+
+**When to clear cache:**
+- After reverting any code change
+- Before running a baseline comparison test
+- Before running a post-optimization test
+- If test results seem inconsistent with the code you see
+
+**Signs of stale cache:**
+- Test results don't match expected behavior from current code
+- `git diff` shows no changes but performance differs from baseline
+- Reverted changes still appear to affect timing
 
 ### Key Files to Modify
 

@@ -189,3 +189,5 @@ aitk_db.db
 
 .github/prompts/*
 .github/prompts/initial-prompt.md
+
+del_cache.sh
