@@ -4,59 +4,162 @@
 
 When working with MPS (Apple Silicon) performance in the AI Toolkit codebase, follow these guidelines:
 
-### Code Categorization for MPS Optimization
+### Core Philosophy
 
-#### 1. Main Pipeline Code
-- `toolkit/stable_diffusion_model.py` - `generate_images()` method (line ~1200)
-- `jobs/process/GenerateProcess.py` - Main generation orchestration
-- `toolkit/models/base_model.py` - Base model class with pipeline management
+**On MPS, eliminate computation — don't cache state.** The winning optimizations (Tasks 1-2, scheduler improvements) eliminated actual redundant work (allocations, object creation, data transfers). The failing optimizations (Tasks 3-12) tried to cache device state, add conditionals, or create shared references — all of which add overhead on MPS.
 
-#### 2. General Image Creation Code
-- `toolkit/sampler.py` - Sampler utilities
-- `toolkit/pipelines.py` - Custom pipeline implementations
+### Key Reference Documents
 
-#### 3. Flux Specific Code
-- `extensions_built_in/diffusion_models/flux2/` - FLUX.2 model implementation
-- `extensions_built_in/diffusion_models/flux_kontext/` - FLUX Kontext
-- `toolkit/samplers/custom_flowmatch_sampler.py` - Custom flow match scheduler
+- **[mac-performance-improvements-findings.md](./mac-performance-improvements-findings.md)** — Complete findings from all optimizations (accepted + rejected), cross-model applicability, implementation checklists
+- **[z_image-tasks.md](./models/z_image/z_image-tasks.md)** — Z-Image task tracking with status table and rejected lessons
+- **[chroma-mac-results.md](./models/chroma/chroma-mac-results.md)** — Chroma MPS test results
+- **[z_mage-mac-results.md](./models/z_image/z_mage-mac-results.md)** — Z-Image MPS test results
+- **[results.md](./results.md)** — Original Chroma optimization results (DGX)
+- **[implement_torch_util.md](./implement_torch_util.md)** — torch_util.py consolidation plan
 
-#### 4. Chroma Specific Code
-- `extensions_built_in/diffusion_models/chroma/` - Chroma model family
-  - `chroma_model.py` - Main Chroma model class
-  - `pipeline.py` - Chroma pipeline with denoising loop
-  - `chroma_radiance_model.py` - Radiance variant
+---
 
-### Development Tools Guidelines
+## MPS-Specific Rules (Non-Negotiable)
 
-**IMPORTANT**: Always use editor tools (read_file, edit_notebook_file, replace_string_in_file, etc.) to view and modify files directly. Do NOT use terminal commands like grep, sed, cat, or find to examine or edit files.
+### ✅ Safe Patterns (Proven — Use These)
 
-### MPS Performance Issues to Watch For
+| Pattern | Why It Works | Examples |
+|---------|--------------|----------|
+| **Pipeline caching** | Eliminates expensive object recreation | Tasks 1 (Z-Image, Chroma) |
+| **Tensor op optimization** | No Python object sharing; pure tensor math | Task 2 (Z-Image) |
+| **`copy.deepcopy()` for cloning** | Fully independent copies | Data loader |
+| **Simple scalar caching** | No complex object graph | int, float, bool, tensor |
+| **Constant tensor caching** | Immutable after creation | ROPE omega, timestep freqs |
+| **`to_device_if_needed()`** | One `.device` comparison; saves transfers | SDTrainer 50+ replacements |
+| **`flush(garbage_collect=False)`** | MPS cache flush without GC blocking | Training loop |
+| **`detach().clone().requires_grad_(True)`** | Avoids in-place sync trigger | Chroma model.py |
+| **CUDA-only guards** | Cold-path checks; not on hot path | `torch.cuda.manual_seed()` |
+| **Dtype selection at creation** | One allocation vs. allocate + convert | `torch.zeros(..., dtype=...)` |
+| **`torch.searchsorted`** | Vectorized indexing vs. Python loop | `_get_step_indices()` |
 
-1. **Excessive CPU↔GPU Transfers** - Tensors bouncing between CPU and GPU
-2. **Timesteps Weights Not Cached** - No device change detection for weights
-3. **Latent Image IDs Created on Wrong Device** - CPU then moved to device
-4. **VAE Device Mismatch Risk** - VAE on different device than latents
-5. **No Pipeline Caching** - Pipeline recreated unnecessarily
-6. **Pipeline Not Moved to Device** - `pipeline.to(device)` not called in get_generation_pipeline()
+### ❌ Unsafe Patterns (Avoid on MPS)
 
-### Implementation Order (Inner to Outer)
+| Pattern | Why It Fails | Evidence |
+|---------|--------------|----------|
+| **Conditionals on hot path** | Adds overhead regardless of branch prediction | Tasks 9-11: 15% regression |
+| **`hasattr`/`getattr` caching** | Object graph references prevent GC | Tasks 3-5: regressions |
+| **Dirty flags on hot path** | `if self._flag:` adds overhead | Tasks 10-11 |
+| **`__dict__.update()` for cloning** | Shared references fragment memory | Task 12: 15% regression |
+| **Cached `inspect.signature()`** | Parameter refs interfere with GC | Task 9: gradual degradation |
+| **`gc.collect()` in training loop** | Blocks MPS command queue | Task 8: 9.4% regression |
+| **`torch.no_grad()` + `.requires_grad_(True)`** | Forces command buffer sync every step | Chroma model.py fix |
+| **bfloat16 on MPS** | Not supported | Chroma pipeline.py |
+| **float64 on MPS** | Not supported | Chroma math.py |
+| **`torch.cuda.*` without check** | Crashes on MPS | Multiple files |
+| **Unbounded caches** | Memory grows with unique inputs | Task 6: 25% regression |
+| **Splitting `.to(device, dtype)`** | Can be slower than single call | Lesson 4 |
 
-1. **Phase 1**: Core sampler optimizations (`custom_flowmatch_sampler.py`)
-2. **Phase 2**: Model-level optimizations (`base_model.py`, `chroma_model.py`)
-3. **Phase 3**: Pipeline-level optimizations (`pipeline.py`)
+### ⚠️ Testing Rules
 
-### For Each Change
+| Rule | Reason |
+|------|--------|
+| **Test over 8+ epochs** | Shared reference fragmentation shows as gradual degradation |
+| **Clear `__pycache__` before each test** | Stale `.pyc` files cause false regressions |
+| **Run identical test commands** | System load affects MPS timing |
+| **Measure both training AND generation** | Some changes improve one but regress the other |
+| **Accept threshold: >2% improvement** | Below 2% is within noise margin |
+| **Revert threshold: >2% regression** | Any metric regressing >2% with no compensating gain |
 
-1. Create a test to measure performance **before** making the change
-2. **Clear Python bytecode cache** before running the test (see below)
-3. Apply the fix
-4. **Clear Python bytecode cache** again
-5. Run the same test to verify improvement
-6. Update `/memories/session/mps_improvements_plan.md` with results
+---
+
+## Code Categorization for MPS Optimization
+
+### 1. Shared Toolkit Code (Affects All Models)
+
+| File | Hot Path | Called |
+|------|----------|--------|
+| `toolkit/models/base_model.py` | `predict_noise()`, training loop | Every step |
+| `toolkit/stable_diffusion_model.py` | `generate_images()` | Per generation |
+| `toolkit/samplers/custom_flowmatch_sampler.py` | `get_weights_for_timesteps()`, `get_sigmas()` | Every step |
+| `toolkit/losses.py` | `get_gradient_penalty()` | Every step |
+| `toolkit/optimizer.py` | `get_optimizer()` | At startup |
+| `toolkit/train_tools.py` | `get_noise_from_latents()` | Per batch |
+| `toolkit/data_loader.py` | `_get_single_item()` | Per batch |
+| `toolkit/util/torch_util.py` | Utility functions | Throughout |
+| `jobs/process/BaseSDTrainProcess.py` | Training loop, `end_step_hook()` | Every step |
+| `extensions_built_in/sd_trainer/SDTrainer.py` | `calculate_loss()`, `predict_noise()` | Every step |
+
+### 2. Chroma-Specific Code
+
+| File | Hot Path | Called |
+|------|----------|--------|
+| `extensions_built_in/diffusion_models/chroma/chroma_model.py` | `get_generation_pipeline()`, `get_noise_prediction()` | Per gen / every step |
+| `extensions_built_in/diffusion_models/chroma/chroma_radiance_model.py` | Same as chroma_model | Per gen / every step |
+| `extensions_built_in/diffusion_models/chroma/pipeline.py` | `prepare_latents()`, `prepare_latent_image_ids()` | Per generation |
+| `extensions_built_in/diffusion_models/chroma/src/layers.py` | `timestep_embedding()` | Every step |
+| `extensions_built_in/diffusion_models/chroma/src/math.py` | `rope()`, `apply_rope()` | Every step |
+| `extensions_built_in/diffusion_models/chroma/src/model.py` | Forward pass (mod_vectors) | Every step |
+
+### 3. Z-Image-Specific Code
+
+| File | Hot Path | Called |
+|------|----------|--------|
+| `extensions_built_in/diffusion_models/z_image/z_image.py` | `get_noise_prediction()`, `generate_single_image()` | Every step / per image |
+
+### 4. Unoptimized Models (Targets for Future Work)
+
+| Model | Files to Check |
+|-------|----------------|
+| **flux2** | `extensions_built_in/diffusion_models/flux2/flux2_model.py`, `src/pipeline.py`, `src/sampling.py` |
+| **ernie_image** | `extensions_built_in/diffusion_models/ernie_image/ernie_image.py` |
+| **hidream** | `extensions_built_in/diffusion_models/hidream/hidream_model.py`, `src/models/`, `src/pipelines/`, `src/schedulers/` |
+
+---
+
+## Implementation Order (Inner to Outer)
+
+### Phase 1: Critical Fixes (No Performance Risk)
+These are correctness fixes that prevent crashes or undefined behavior on MPS:
+
+1. Guard all `torch.cuda.*` calls with `if torch.cuda.is_available():`
+2. Replace `torch.cuda.empty_cache()` with `flush()`
+3. Replace bfloat16 with float32 for MPS
+4. Replace float64 with float32 for MPS
+5. Fix `torch.no_grad()` + `.requires_grad_(True)` → `detach().clone().requires_grad_(True)`
+
+### Phase 2: High-Impact Optimizations
+These eliminate redundant work (proven pattern from Tasks 1-2):
+
+6. Add pipeline caching to `get_generation_pipeline()`
+7. Optimize `get_noise_prediction()` tensor operations
+8. Add `to_device_if_needed()` for device transfers
+9. Replace Python loop indexing with `torch.searchsorted`
+
+### Phase 3: Medium-Impact Optimizations
+These cache constant values or reduce allocations:
+
+10. Cache constant tensors (ROPE omega, timestep embeddings)
+11. Add autocast guards for CUDA-only contexts
+12. Remove redundant `.clone()` before `.to('cpu')`
+13. Load state dicts directly to device
+
+### Phase 4: Validation
+14. Test over 8+ epochs (not just first epoch)
+15. Clear `__pycache__` before each test
+16. Measure both training and generation speed
+17. Verify no gradual degradation over epochs
+
+---
+
+## For Each Change
+
+1. **Propose the change** — Show diff/snippet, explain mechanism
+2. **Request approval** — Iterate until user confirms
+3. **Clear Python bytecode cache** (see below)
+4. **Implement** — Apply approved change (≤20 lines)
+5. **Clear Python bytecode cache again**
+6. **User tests** — Run speed test (8 epochs × 30 steps, generate 2 images)
+7. **Record results** — Update task file and findings document
+8. **Next task** — Continue sequentially
 
 ### Clear Python Bytecode Cache (REQUIRED Before Each Test)
 
-**Python caches compiled `.pyc` files in `__pycache__` directories. Stale cache from rejected/ reverted changes will cause old code to run, making optimizations appear to regress when they don't (or vice versa).**
+**Python caches compiled `.pyc` files in `__pycache__` directories. Stale cache from rejected/reverted changes will cause old code to run, making optimizations appear to regress when they don't (or vice versa).**
 
 Before running any speed test, execute:
 
@@ -75,24 +178,77 @@ cd /Users/rlamb/src/ai-toolkit && find . -type d -name __pycache__ -exec rm -rf 
 - `git diff` shows no changes but performance differs from baseline
 - Reverted changes still appear to affect timing
 
-### Key Files to Modify
+---
 
-1. `toolkit/samplers/custom_flowmatch_sampler.py` - Scheduler caching
-2. `toolkit/models/base_model.py` - Pipeline caching
-3. `extensions_built_in/diffusion_models/chroma/pipeline.py` - Device consistency, prepare_latent_image_ids device handling
-4. `extensions_built_in/diffusion_models/chroma/chroma_model.py` - Pipeline device assignment
-5. `extensions_built_in/diffusion_models/chroma/chroma_radiance_model.py` - Pipeline device assignment
-6. `toolkit/optimizers/optimizer_utils.py` - MPS sync point optimization
+## Performance Baselines
 
-### Test Pattern for Each Change (see above)
+### Z-Image (M5 Max, 128GB)
 
-## MPS Optimization Status
+| Stage | Training s/it | Generation s/img |
+|-------|---------------|------------------|
+| Original baseline | 8.77s | 38.5s |
+| After Task 1 (pipeline cache) | 7.48s | 36.3s |
+| After Task 2 (tensor ops) | 7.26s | 37.0s |
+| **Current optimized** | **7.26s** | **37.0s** |
 
-See the following for the current status of all MPS optimizations:
-- [mac-results.md](./mac-results.md) - Detailed test results for each change
-  - Update this as each change is completed.
-- [mac-change-6.md](./tasks/archive/mac-change-6.md) - Missing MPS logic analysis (Change #6)
+### Chroma (M5 Max, 128GB)
+
+| Stage | Training s/it | Generation s/img |
+|-------|---------------|------------------|
+| Original baseline | 11.93s | 55.0s |
+| **Current optimized** | **~11.5s** | **~57.7s** |
 
 ---
 
-**Last Updated**: 2026-06-08
+## torch_util.py API Reference
+
+All device-related operations should use `toolkit/util/torch_util.py` utilities:
+
+| Function | Purpose |
+|----------|---------|
+| `get_device_type(device)` | Get device type string: 'cuda', 'mps', 'cpu' |
+| `is_cuda_available()` | Check if CUDA is available |
+| `is_mps_available()` | Check if MPS is available |
+| `get_default_device()` | Best available device: cuda > mps > cpu |
+| `is_cuda_device(device)` | Check if device is CUDA |
+| `is_mps_device(device)` | Check if device is MPS |
+| `get_autocast_context(device, enabled, dtype)` | Autocast for CUDA, nullcontext for others |
+| `get_text_dtype(device)` | float32 for MPS, bfloat16 otherwise |
+| `mps_safe_float(tensor, device)` | Ensure float32 on MPS |
+| `synchronize(device)` | Synchronize CUDA or MPS |
+| `flush_cache(garbage_collect)` | Flush CUDA/MPS caches + GC |
+| `save_rng_state()` / `restore_rng_state()` | Save/restore CPU and CUDA RNG |
+| `set_seed(seed)` | Set both CPU and CUDA random seeds |
+
+---
+
+## Applying Optimizations to New Models
+
+When optimizing flux2, ernie_image, or hidream, follow the checklist in [mac-performance-improvements-findings.md](./mac-performance-improvements-findings.md) Part 7.
+
+**Quick checklist:**
+1. [ ] Pipeline caching in `get_generation_pipeline()`
+2. [ ] bfloat16 → float32 for MPS
+3. [ ] float64 → float32 for MPS
+4. [ ] Guard `torch.cuda.*` calls
+5. [ ] Replace `torch.cuda.empty_cache()` with `flush()`
+6. [ ] Fix `torch.no_grad()` + `.requires_grad_(True)` pattern
+7. [ ] Optimize `get_noise_prediction()` tensor ops
+8. [ ] Add `to_device_if_needed()` for transfers
+9. [ ] Cache constant tensors (ROPE, timestep embeddings)
+10. [ ] Add autocast guards for CUDA-only contexts
+
+---
+
+## Agent Behavior
+
+- Inspect tool outputs carefully; if unclear, ask user to check debug view
+- Prefer action over hesitation — try changes, revert if needed
+- For uncertain changes, ask user to **git commit** first
+- **DO NOT commit or push** — User handles version control
+- Use `.venv` Python (`.venv/bin/python`, `.venv/bin/pip`)
+- Use `torch_util.py` helpers (`get_device_type()`, `is_mps_device()`, `flush()`, etc.)
+
+---
+
+**Last Updated**: 2026-06-26

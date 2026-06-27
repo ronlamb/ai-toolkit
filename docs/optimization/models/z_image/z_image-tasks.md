@@ -135,8 +135,8 @@ This file contains the optimization tasks we will work on one by one, ordered by
 | 8    | Reverted | 7.48s/it | 8.18s/it | Regression | Flush() calls add sync overhead |
 | 9    | Reverted | 7.26s/it | 7.0→7.8s/it | Regression | Cached signature objects cause memory fragmentation on MPS over time |
 | 10   | Reverted | 7.26s/it | 8.3-8.6s/it | ~15% regression | Even local boolean conditional on hot path adds overhead on MPS |
-| 11   | Pending | 7.26s/it | | | Device/dtype check reduction |
-| 12   | Pending | 7.26s/it | | | Data loading optimization |
+| 11   | Reverted | 7.26s/it | 8.4-8.6s/it | ~15% regression | Dirty flag conditional on hot path adds overhead, same as Tasks 9/10 |
+| 12   | Reverted | 7.26s/it | 8.4-8.6s/it | ~15% regression | Shallow copy via __dict__.update() creates shared references that fragment MPS memory |
 
 ## Rejected Optimization Lessons (MPS-Specific)
 
@@ -148,7 +148,9 @@ This file contains the optimization tasks we will work on one by one, ordered by
 6. **Micro-benchmarks don't predict real-world MPS performance** — `.reshape()` showed 35-48% speedup in isolation but caused 11% regression in full training
 7. **Any conditional on hot path adds overhead** — `hasattr`, `getattr`, `if is_flow_matching` all caused regressions
 8. **Stale .pyc cache causes false regressions** — Always clear `__pycache__` before testing
-9. **Cached signature objects fragment MPS memory** — `inspect.signature()` results held as instance attributes cause gradual slowdown (7.0s → 7.8s over 8 epochs) due to Parameter object references interfering with GC
+9. **Cached signature objects fragment MPS memory** — `inspect.signature()` results held as instance attributes cause gradual slowdown (7.0s → 7.8s over 8 epochs) due to Parameter object references interfering with GC over time
+10. **Dirty flag conditionals add overhead** — `if self._unet_device_dirty:` on hot path caused 7.26s → 8.4-8.6s regression (~15%), confirming any Python-level conditional in `predict_noise` is too expensive on MPS
+11. **Shallow copies fragment MPS memory** — `__dict__.update()` on FileItemDTO creates shared references that cause gradual slowdown (7.79s → 8.6s over epochs), same pattern as cached signature objects
 
 ## Test Procedure
 For each task:
