@@ -173,6 +173,38 @@ class FileItemDTO(
         self.cleanup_mask()
         self.cleanup_unconditional()
 
+
+class DataLoaderBatchDTO:
+    def __init__(self, **kwargs):
+        try:
+            self.file_items: List["FileItemDTO"] = kwargs.get("file_items", None)
+            is_latents_cached = self.file_items[0].is_latent_cached
+            self.tensor: Union[torch.Tensor, None] = None
+            self.latents: Union[torch.Tensor, None] = None
+            self.control_tensor: Union[torch.Tensor, None] = None
+            self.control_tensor_list: Union[List[List[torch.Tensor]], None] = None
+            self.clip_image_tensor: Union[torch.Tensor, None] = None
+            self.mask_tensor: Union[torch.Tensor, None] = None
+            self.unaugmented_tensor: Union[torch.Tensor, None] = None
+            self.unconditional_tensor: Union[torch.Tensor, None] = None
+            self.unconditional_latents: Union[torch.Tensor, None] = None
+            self.clip_image_embeds: Union[List[dict], None] = None
+            self.clip_image_embeds_unconditional: Union[List[dict], None] = None
+            self.sigmas: Union[torch.Tensor, None] = (
+                None  # can be added elseware and passed along training code
+            )
+            self.extra_values: Union[torch.Tensor, None] = (
+                torch.tensor([x.extra_values for x in self.file_items])
+                if len(self.file_items[0].extra_values) > 0
+                else None
+            )
+            self.audio_data: Union[List, None] = (
+                [x.audio_data for x in self.file_items]
+                if self.file_items[0].audio_data is not None
+                else None
+            )
+            self.audio_tensor: Union[torch.Tensor, None] = None
+
             self.first_frame_latents: Union[torch.Tensor, None] = None
             self.audio_latents: Union[torch.Tensor, None] = None
 

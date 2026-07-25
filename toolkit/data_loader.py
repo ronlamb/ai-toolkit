@@ -576,7 +576,6 @@ class AiToolkitDataset(LatentCachingMixin, ControlCachingMixin, CLIPCachingMixin
             current_file_list = [x for x in self.file_list]
             for file_item in current_file_list:
                 # create a copy that is flipped on the y axis
-                new_file_item = copy.deepcopy(file_itemon the y axis
                 new_file_item = copy.deepcopy(file_item)
                 new_file_item.flip_y = True
                 self.file_list.append(new_file_item)
@@ -612,7 +611,7 @@ class AiToolkitDataset(LatentCachingMixin, ControlCachingMixin, CLIPCachingMixin
             return len(self.batch_indices)
         return len(self.file_list)
 
-    def _get_single_item(self, indecopy.deepcopy(self.file_list[index]
+    def _get_single_item(self, index):
         file_item: 'FileItemDTO' = copy.deepcopy(self.file_list[index])
         file_item.load_and_process_image(self.transform)
         file_item.load_caption(self.caption_dict)
