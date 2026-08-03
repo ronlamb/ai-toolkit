@@ -16,6 +16,12 @@ from safetensors.torch import load_file
 from huggingface_hub import hf_hub_download
 
 from toolkit.print import print_acc
+from toolkit.util.ostris_quant import (
+    OstrisLinear,
+    OstrisQuantizer,
+    convert_linear_to_ostris,
+    get_ostris_quantizer,
+)
 import os
 
 if TYPE_CHECKING:
@@ -31,6 +37,7 @@ Q_MODULES = [
     "QLayerNorm",
     "QConvTranspose2d",
     "QEmbeddingBag",
+    "OstrisLinear",
 ]
 
 torchao_qtypes = {
@@ -53,13 +60,70 @@ class aotype:
         self.config = torchao_qtypes[name]
 
 
+class ostristype:
+    # custom quantization backend (see toolkit/util/ostris_quant.py), e.g. orbit2/3/4
+    def __init__(self, name: str, quantizer: OstrisQuantizer):
+        self.name = name
+        self.quantizer = quantizer
+
+
 def get_qtype(qtype: Union[str, qtype]) -> qtype:
     if qtype in torchao_qtypes:
         return aotype(qtype)
     if isinstance(qtype, str):
+        ostris_quantizer = get_ostris_quantizer(qtype)
+        if ostris_quantizer is not None:
+            return ostristype(qtype, ostris_quantizer)
         return qtypes[qtype]
     else:
         return qtype
+
+
+def is_quantized_tensor(t) -> bool:
+    # torchao stores quantized weights as tensor subclasses (e.g. AffineQuantizedTensor) under torchao.*
+    # that still report as nn.Parameter and expose .dequantize(). (quanto is handled separately.)
+    # OstrisLinear.weight returns an already-dequantized tensor tagged with _is_ostris_weight
+    # (its .dequantize() is a no-op) so the merge paths route through requantize_module_weight.
+    if getattr(t, '_is_ostris_weight', False):
+        return True
+    return 'torchao' in type(t).__module__ and hasattr(t, 'dequantize')
+
+
+def dequantize_if_quantized(t):
+    return t.dequantize() if is_quantized_tensor(t) else t
+
+
+def get_torchao_config(qtype):
+    # returns the requantization config for a given qtype string (a torchao config, or the
+    # ostristype for custom backends), or None if the qtype supports neither
+    if qtype is None:
+        return None
+    try:
+        q = get_qtype(qtype)
+    except Exception:
+        return None
+    if isinstance(q, aotype):
+        return q.config
+    if isinstance(q, ostristype):
+        return q
+    return None
+
+
+def requantize_module_weight(module, fp_weight, orig_dtype, config) -> None:
+    """Write a full precision weight back into module.weight, re-quantizing in place if a
+    requantization config is provided so the module stays quantized (used by the continuous
+    merge/reset method). If config is None the weight is left in full precision."""
+    if isinstance(module, OstrisLinear):
+        # the module's backend reuses its existing quantization state; config is not needed
+        module.requantize_(fp_weight)
+        return
+    if isinstance(config, ostristype):
+        # custom backend config but the module was never converted (e.g. skipped at
+        # quantize time); leave it in full precision
+        config = None
+    module.weight = torch.nn.Parameter(fp_weight.to(orig_dtype), requires_grad=False)
+    if config is not None:
+        torchao_quantize_(module, config)
 
 
 def quantize(
@@ -112,7 +176,10 @@ def quantize(
             if m.__class__.__name__ in Q_MODULES:
                 continue
             else:
-                if isinstance(weights, aotype):
+                if isinstance(weights, ostristype):
+                    if isinstance(m, torch.nn.Linear):
+                        convert_linear_to_ostris(m, weights.quantizer)
+                elif isinstance(weights, aotype):
                     torchao_quantize_(m, weights.config)
                 else:
                     _quantize_submodule(
@@ -141,6 +208,9 @@ def quantize_model(
 
     # patch the state dict method
     patch_dequantization_on_save(model_to_quantize)
+
+    # sensitive modules to keep in full precision (fnmatch patterns)
+    exclude_modules = base_model.get_quantization_exclude_modules() or []
 
     if base_model.model_config.accuracy_recovery_adapter is not None:
         from toolkit.config_modules import NetworkConfig
@@ -287,7 +357,7 @@ def quantize_model(
         quantize(
             model_to_quantize,
             weights=quantization_type,
-            exclude=lora_exclude_modules
+            exclude=lora_exclude_modules + exclude_modules
         )
     else:
         # quantize model the original way without an accuracy recovery adapter
@@ -297,7 +367,13 @@ def quantize_model(
         all_blocks: List[torch.nn.Module] = []
         transformer_block_names = base_model.get_transformer_block_names()
         for name in transformer_block_names:
-            block_list = getattr(model_to_quantize, name, None)
+            # name may be a dotted path for models that nest their blocks
+            # (e.g. hidream_o1's "model.language_model.layers").
+            block_list = model_to_quantize
+            for part in name.split('.'):
+                block_list = getattr(block_list, part, None)
+                if block_list is None:
+                    break
             if block_list is not None:
                 all_blocks += list(block_list)
         base_model.print_and_status_update(
@@ -313,5 +389,5 @@ def quantize_model(
         # device without having to move the transformer blocks to the device first
         base_model.print_and_status_update(" - quantizing extras")
         # model_to_quantize.to(base_model.device_torch, dtype=base_model.torch_dtype)
-        quantize(model_to_quantize, weights=quantization_type)
+        quantize(model_to_quantize, weights=quantization_type, exclude=exclude_modules)
         freeze(model_to_quantize)

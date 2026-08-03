@@ -199,6 +199,11 @@ class BucketsMixin:
             for start_idx in range(0, len(bucket.file_list_idx), self.batch_size):
                 end_idx = min(start_idx + self.batch_size, len(bucket.file_list_idx))
                 batch = bucket.file_list_idx[start_idx:end_idx]
+                # if the bucket has fewer items left than the requested batch size,
+                # duplicate items from this batch to pad it up to batch_size
+                if len(batch) < self.batch_size and len(batch) > 0:
+                    pad = [batch[i % len(batch)] for i in range(self.batch_size - len(batch))]
+                    batch = batch + pad
                 self.batch_indices.append(batch)
 
     def shuffle_buckets(self: 'AiToolkitDataset'):
@@ -754,17 +759,20 @@ class ImageProcessingDTOMixin:
         # if we are caching latents, just do that
         if self.is_latent_cached:
             self.get_latent()
-            if self.has_control_image:
-                self.load_control_image()
-            if self.has_inpaint_image:
-                self.load_inpaint_image()
-            if self.has_clip_image:
-                self.load_clip_image()
-            if self.has_mask_image:
-                self.load_mask_image()
-            if self.has_unconditional:
-                self.load_unconditional_image()
-            return
+            # if load_image_when_caching_latents is set, we still need the raw image
+            # tensor in addition to the cached latent, so fall through to load it below
+            if not self.dataset_config.load_image_when_caching_latents:
+                if self.has_control_image:
+                    self.load_control_image()
+                if self.has_inpaint_image:
+                    self.load_inpaint_image()
+                if self.has_clip_image:
+                    self.load_clip_image()
+                if self.has_mask_image:
+                    self.load_mask_image()
+                if self.has_unconditional:
+                    self.load_unconditional_image()
+                return
         if self.is_audio_model:
             self.load_and_process_audio()
             return
@@ -988,11 +996,33 @@ class ControlFileItemDTOMixin:
                 # only do one
                 self.control_path = self.control_path[0]
 
+        if dataset_config.control_from_same_folder:
+            # assume we have them. We will pull them on load.
+            self.full_size_control_images = dataset_config.full_size_control_images
+            self.has_control_image = True
+
+    def get_new_control_paths(self: 'FileItemDTO'):
+        if self.dataset_config.control_from_same_folder:
+            # randomly grab image paths from the same folder as if they came from control_path
+            pool_folder = os.path.dirname(self.path)
+            # find all images in the folder
+            img_files = []
+            for ext in img_ext_list:
+                img_files += glob.glob(os.path.join(pool_folder, f'*{ext}'))
+            # remove the current image if len is greater than 1
+            if len(img_files) > 1:
+                img_files.remove(self.path)
+            num_controls = min(self.dataset_config.num_controls_from_same_folder, len(img_files))
+            # randomly grab them
+            return random.sample(img_files, num_controls)
+        else:
+            return self.control_path
+
     def load_control_image(self: 'FileItemDTO'):
         control_tensors = []
-        control_path_list = self.control_path
-        if not isinstance(self.control_path, list):
-            control_path_list = [self.control_path]
+        control_path_list = self.get_new_control_paths()
+        if not isinstance(control_path_list, list):
+            control_path_list = [control_path_list]
         
         for control_path in control_path_list:
             try:
@@ -1883,9 +1913,7 @@ class TextEmbeddingCachingMixin:
                         self.sd.set_device_state_preset('cache_text_encoder')
                         did_move = True
                         
-                    if file_item.encode_control_in_text_embeddings:
-                        if file_item.control_path is None:
-                            raise Exception(f"Could not find a control image for {file_item.path} which is needed for this model")
+                    if file_item.encode_control_in_text_embeddings and file_item.control_path is not None:
                         ctrl_img_list = []
                         control_path_list = file_item.control_path
                         if not isinstance(file_item.control_path, list):
