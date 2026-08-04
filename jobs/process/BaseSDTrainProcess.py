@@ -500,10 +500,12 @@ class BaseSDTrainProcess(BaseTrainProcess):
             if self.adapter is not None and hasattr(self.adapter, 'clear_memory'):
                 self.adapter.clear_memory()
             
-            # Clear sample prompts cache if it's accumulating
-            if hasattr(self.sd, 'sample_prompts_cache') and self.sd.sample_prompts_cache is not None:
-                # Clear the cache to prevent memory accumulation
-                self.sd.sample_prompts_cache = None
+            # NOTE: Do NOT clear sample_prompts_cache here. It contains pre-encoded
+            # prompt embeddings (tensors), not the text encoder itself. Clearing it
+            # forces generate_images() to re-encode prompts, which will fail when
+            # the text encoder has been unloaded (replaced with FakeTextEncoder).
+            # The cache is small (just embeddings for sample prompts) and doesn't
+            # accumulate across epochs.
             
             # Clean up cache
             flush()
