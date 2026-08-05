@@ -12,8 +12,8 @@
 - [x] **Task 1**: CPU-to-GPU transfer in `pad_text_features` (5 lines) - Expected: 5-10% speedup - **REVERTED**
 - [x] **Task 2**: Latent device transfer in `predict_velocity` (4 lines) - Expected: 5-10% speedup - **REVERTED**
 - [x] **Task 3**: Reference latents device transfer in `pack_ref_latents` (1 line) - Expected: 2-5% speedup - **REVERTED**
-- [ ] **Task 4**: VAE encoding device transfer in `encode_images` (3 lines) - Expected: 5-10% speedup
-- [ ] **Task 5**: Timestep tensor creation in sampling loop (4 lines) - Expected: 2-5% speedup
+- [x] **Task 4**: Eliminate redundant latents.dtype conversions in sampling loop (4 lines) - Expected: 5-8% speedup
+- [ ] **Task 5**: Eliminate redundant `.to()` in `encode_images` return (1 line) - Expected: 2-5% speedup
 
 **Note**: Baseline variation is significant (training: 11.9% range, samples: 6.0% range). Only changes with >5% improvement should be considered real improvements.
 
@@ -22,9 +22,12 @@
 - Change #1: ⚠️ REVERTED (no measurable improvement - within baseline variation)
 - Change #2: ⚠️ REVERTED (no measurable improvement - within baseline variation)
 - Change #3: ⚠️ REVERTED (no measurable improvement - within baseline variation)
-- Current Task: Change #4 (VAE encoding device transfer)
+- Change #4: ⚠️ REVERTED (1.3% slower - within baseline variation)
+- Change #5: ⚠️ REVERTED (2.6% slower training, 1.4% slower samples - within baseline variation)
+- Current Task: No more optimization tasks available
 - Completed Tasks: 0/5
 - Total Expected Speedup (excluding reverted): 12-33%
+- **Status**: All optimization tasks completed. No further improvements found within the 20-line limit constraint.
 
 **Baseline Variation Analysis**:
 - Training time range: 3.62s - 4.05s (11.9% variation)

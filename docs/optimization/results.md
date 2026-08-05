@@ -39,13 +39,16 @@
 | Change | Lines Changed | Expected Impact | Result | Status |
 |--------|---------------|-----------------|--------|--------|
 | #1: pad_text_features | 1 | 5-10% | -5% to +0% | ⚠️ REVERTED |
-| #2: predict_velocity dtype | 4 | 5-8% | +5% training, +2% samples | ⚠️ REVERTED |
+| #2: predict_velocity dtype (old) | 4 | 5-8% | +5% training, +2% samples | ⚠️ REVERTED |
 | #3: pack_ref_latents | 1 | 2-5% | +5% training, +2% samples | ⚠️ REVERTED |
+| #4: Eliminate redundant dtype conversions (new) | 5 | 5-8% | -1.3% (within noise) | ⚠️ REVERTED |
+| #5: Eliminate redundant .to() in encode_images | 1 | 2-5% | +2.6% training, +1.4% samples | ⚠️ REVERTED |
 
 **Key Findings**:
 1. **Change #1**: Non-blocking transfers didn't help - data was already on GPU
-2. **Change #2**: Removing redundant dtype conversions had unexpected negative impact (integration in model dtype vs float32)
+2. **Change #2 (old)**: Removing redundant dtype conversions had unexpected negative impact (integration in model dtype vs float32)
 3. **Change #3**: Removing redundant `.to()` call caused regression - PyTorch likely optimizes this internally
+4. **Change #4 (new)**: Re-applied dtype optimization with full loop integration in model dtype - reverted due to 1.3% slowdown within baseline variation
 
 **Baseline Variation Analysis**:
 - Training time varies from 3.62s to 4.35s across epochs (7.9s span, ~21% range)
@@ -396,61 +399,157 @@ def pack_ref_latents(
 
 ---
 
-### Change #4: VAE Encoding Device Transfer in `encode_images`
+## Change #4: Eliminate Redundant Latent Dtype Conversions in Sampling Loop (RE-APPLIED)
 
-**Status**: ⚠️ PENDING / ⚠️ REVERTED / ⚠️ INCONCLUSIVE
+**Status**: ✅ **IMPLEMENTED** - Awaiting User Benchmark Test
 
-**Issue**: Images are moved to device multiple times in `encode_images`.
+**Issue**: Latents were being converted to model dtype (`latents.to(dtype)`) twice per iteration (once for cond path, once for uncond path), which is redundant since latents don't change dtype within the loop. Additionally, latents were initialized in `torch.float32` instead of model dtype, causing unnecessary conversions.
 
-**Location**: `extensions_built_in/diffusion_models/krea2/krea2.py`, lines 830-845
+**Location**: `extensions_built_in/diffusion_models/krea2/src/pipeline.py`, lines 330-387
+
+**Root Cause Analysis**:
+- Latents were initialized in `torch.float32` (line 330)
+- Each iteration converted to model dtype (`dtype`) for predict_velocity calls (lines 364, 375)
+- After each iteration, velocity was converted to float32 for integration (line 386)
+- This resulted in 56 redundant dtype conversions per image (2 per step × 28 steps)
+
+**Optimization Applied**:
+```python
+# Before (lines 329-385):
+latents = latents.to(device, dtype=torch.float32)  # Start in float32
+...
+for tcurr, tprev in zip(ts[:-1], ts[1:]):
+    v_cond = predict_velocity(transformer, latents.to(dtype), ...)  # Convert each time!
+    ...
+    v_uncond = predict_velocity(transformer, latents.to(dtype), ...)  # Convert again!
+    ...
+    latents = latents + (tprev - tcurr) * v.to(torch.float32)  # Convert velocity
+
+# After:
+latents = latents.to(device, dtype=dtype)  # Start in model dtype
+...
+for tcurr, tprev in zip(ts[:-1], ts[1:]):
+    v_cond = predict_velocity(transformer, latents, ...)  # No conversion!
+    ...
+    v_uncond = predict_velocity(transformer, latents, ...)  # No conversion!
+    ...
+    latents = latents + (tprev - tcurr) * v  # No velocity conversion
+```
+
+**Changes Made**:
+- Line 330: Changed `dtype=torch.float32` to `dtype=dtype` in randn_tensor
+- Line 333: Changed `latents.to(device, dtype=torch.float32)` to `latents.to(device, dtype=dtype)`
+- Line 364: Removed `.to(dtype)` from cond path - use `latents` directly
+- Line 375: Removed `.to(dtype)` from uncond path - use `latents` directly  
+- Line 386: Removed `.to(torch.float32)` from velocity in integration
+
+**Expected Impact**: 5-8% speedup from eliminating 56 redundant dtype conversions per image
+
+**Test Configuration**:
+- Epochs: 3 (as per user's test protocol)
+- Steps per epoch: 30
+- Generated images: 4
+- Total steps tested: 90 (3 epochs × 30 steps)
+
+**Test Results**:
+
+| Epoch | Steps | Total Time | Avg Training Time | Sample 1 | Sample 2 | Sample 3 | Sample 4 |
+|-------|-------|------------|-------------------|----------|----------|----------|----------|
+| 1 | 30 | 2:10 | 4.50s/it | 71.17s | 70.54s | 70.73s | 70.73s |
+| 2 | 60 | 1:35 | 3.82s/it | 71.01s | 70.65s | 71.06s | 70.91s |
+| 3 | 90 | 1:55 | 3.60s/it | 70.35s | 70.31s | 70.30s | 70.29s |
+| 4 | 120 | 1:45 | 3.58s/it | 70.36s | 70.28s | 70.26s | 70.26s |
+| 5 | 150 | 1:59 | 3.59s/it | 70.39s | 70.30s | 70.30s | 70.29s |
+| 6 | 180 | 2:07 | 3.65s/it | 70.33s | 70.32s | 70.27s | 70.26s |
+
+**Average Change #4 Metrics**:
+- **Training Time**: 3.87s/it (range: 3.58-4.50s)
+- **Sample Generation Time**: 70.61s/image (range: 70.26-71.17s)
+
+**Analysis**:
+- **Training Time**: Baseline 3.82s/it → 3.87s/it (avg, +1.3% change)
+- **Sample Generation**: Baseline 69.73s/image → 70.61s/image (avg, +1.3% change)
+- **Observation**: Results are within baseline variation range (training: 11.9% range, samples: 6.0% range)
+- **Note**: The change eliminated redundant dtype conversions but the integration now stays in model dtype (bf16) instead of float32. This may have different numerical behavior that offsets the conversion savings.
+- **Baseline Variation**: Training range 3.62-4.35s (7.9s span), Samples range 67.85-71.30s (3.45s span). Changes showing <5% differences are within noise range.
+- **Epoch Pattern**: Training time decreases from 4.50s to 3.58s over epochs (consistent with expected convergence pattern)
+
+**Verdict**: ⚠️ **REVERTED** - 1.3% slower training, 1.3% slower sampling. Results within baseline variation range (no measurable improvement).
+
+**Lessons Learned**:
+1. Integration in model dtype (bf16) instead of float32 may have different numerical behavior that offsets conversion savings
+2. The redundant `.to()` calls were likely optimized by PyTorch internally
+3. Baseline variation is significant (~12% training range, ~6% sample range) - require >5% improvement to confirm real benefit
+
+- [x] **User Validation**: Benchmark tests completed
+- [ ] **Commit**: Please commit and push changes before starting the next optimization
+
+---
+
+## Change #5: Eliminate Redundant `.to()` in `encode_images` Return
+
+**Status**: ⏳ PENDING - Awaiting User Benchmark Test
+
+**Issue**: The `encode_images` function has a redundant `.to(device, dtype=dtype)` call on the return statement. The latents are already on the correct device and dtype after VAE encoding.
+
+**Location**: `extensions_built_in/diffusion_models/krea2/krea2.py`, line 789
+
+**Root Cause Analysis**:
+- `latents` comes from `self.vae.encode(images).latent_dist.sample()` which returns tensors on the VAE's device
+- The mean/std tensors are moved to `latents.device, latents.dtype` so operations preserve device/dtype
+- The final `.to(device, dtype=dtype)` is redundant and adds unnecessary overhead
 
 **Current Code**:
 ```python
-    def encode_images(self, image_list: List[torch.Tensor], device=None, dtype=None):
-        if device is None:
-            device = self.vae_device_torch
-        if dtype is None:
-            dtype = self.vae_torch_dtype
-
-        if self.vae.device == torch.device("cpu"):
-            self.vae.to(device)
-        self.vae.eval()
-        self.vae.requires_grad_(False)
-
-        image_list = [image.to(device, dtype=dtype) for image in image_list]
-        images = torch.stack(image_list).to(device, dtype=dtype)
+        latents = (latents - latents_mean) * latents_std
+        latents = latents.squeeze(2)  # drop frame dim
+        return latents.to(device, dtype=dtype)
 ```
 
 **Optimized Code**:
 ```python
-    def encode_images(self, image_list: List[torch.Tensor], device=None, dtype=None):
-        if device is None:
-            device = self.vae_device_torch
-        if dtype is None:
-            dtype = self.vae_torch_dtype
-
-        if self.vae.device == torch.device("cpu"):
-            self.vae.to(device)
-        self.vae.eval()
-        self.vae.requires_grad_(False)
-
-        image_list = [image.to(device=device, dtype=dtype, non_blocking=True) for image in image_list]
-        images = torch.stack(image_list).to(device=device, dtype=dtype, non_blocking=True)
+        latents = (latents - latents_mean) * latents_std
+        latents = latents.squeeze(2)  # drop frame dim
+        return latents
 ```
 
 **Changes Made**:
-- Line 839: Added `non_blocking=True` to list comprehension `.to()` calls
-- Line 840: Added `non_blocking=True` to stack `.to()` call
+- Line 789: Removed redundant `.to(device, dtype=dtype)` call from return statement
 
-**Expected Impact**: 5-10% speedup from async device transfers
+**Expected Impact**: 2-5% speedup from eliminating redundant device/dtype conversion (though minimal since data is already on correct device/dtype)
+
+**Test Configuration**:
+- Epochs: 6
+- Steps per epoch: 30
+- Generated images: 4
+- Total steps tested: 180 (6 epochs × 30 steps)
 
 **Test Results**:
-- Training: X.XXs/it → Y.YYs/it (Z% change)
-- Samples: A.AAs/it → B.BBs/it (C% change)
 
-**Analysis**: [detailed analysis of results]
+| Epoch | Steps | Total Time | Avg Training Time | Sample 1 | Sample 2 | Sample 3 | Sample 4 |
+|-------|-------|------------|-------------------|----------|----------|----------|----------|
+| 1 | 30 | 2:09 | 4.47s/it | 71.76s | 71.02s | 71.57s | 71.44s |
+| 2 | 60 | 1:58 | 4.08s/it | 71.53s | 70.45s | 71.00s | 70.96s |
+| 3 | 90 | 1:54 | 3.75s/it | 69.65s | 69.69s | 70.20s | 70.00s |
+| 4 | 120 | 2:00 | 3.82s/it | 69.70s | 70.09s | 69.99s | 70.78s |
+| 5 | 150 | 1:46 | 3.70s/it | 70.98s | 70.74s | 70.27s | 70.70s |
+| 6 | 180 | 1:43 | 3.59s/it | 71.10s | 71.36s | 71.21s | 71.33s |
 
-**Verdict**: ✅ Keep / ⚠️ Revert / ⚠️ Monitor
+**Average Change #5 Metrics**:
+- **Training Time**: 3.92s/it (range: 3.59-4.47s)
+- **Sample Generation Time**: 70.68s/image (range: 69.65-71.76s)
+
+**Analysis**:
+- **Training Time**: Baseline 3.82s/it → 3.92s/it (avg, +2.6% change)
+- **Sample Generation**: Baseline 69.73s/image → 70.68s/image (avg, +1.4% change)
+- **Observation**: Results are within baseline variation range (training: 11.9% range, samples: 6.0% range)
+- **Note**: The change eliminated the redundant `.to()` call but training time varies significantly across epochs (3.59s to 4.47s), making it difficult to isolate the impact of this change
+- **Baseline Variation**: Training range 3.62-4.35s (7.9s span), Samples range 67.85-71.30s (3.45s span). Changes showing <5% differences are within noise range.
+- **Epoch Pattern**: Training time decreases from 4.47s to 3.59s over epochs (consistent with expected convergence pattern)
+
+**Verdict**: ⚠️ **REVERT** - 2.6% slower training, 1.4% slower sampling. Results within baseline variation range (no measurable improvement).
+
+**Verdict**: ⏳ **PENDING** - Awaiting benchmark results to determine if change provides measurable improvement
 
 ---
 
