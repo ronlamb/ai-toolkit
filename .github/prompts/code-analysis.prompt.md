@@ -1,4 +1,7 @@
-# Codebase Analysis
+---
+agent: 'agent'
+description: 'Analyze codebase processing loop'
+---
 
 Please analyze the processing loop for the given model and identify ways to improve its speed in both the training loop and the image generation loop.
 
