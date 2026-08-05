@@ -52,8 +52,8 @@ For each change, evaluate benchmark results:
 
 Use the following two files:
 
-- **`implementation-checklist.md`** – Track progress of each change
-- **`results.md`** – Record detailed results for each optimization
+- **`docs\implementation-checklist.md`** – Track progress of each change
+- **`docs\results.md`** – Record detailed results for each optimization
 
 Update both after each change. 
 Reset them only when starting a new optimization session.
