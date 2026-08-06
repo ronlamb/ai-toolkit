@@ -767,12 +767,16 @@ class Krea2Model(BaseModel):
         self.vae.eval()
         self.vae.requires_grad_(False)
 
-        image_list = [image.to(device, dtype=dtype) for image in image_list]
-        images = torch.stack(image_list).to(device, dtype=dtype)
+        latents = []
+        for img in image_list:
+            img = img.to(device, dtype=dtype).unsqueeze(0)  # Add batch dim
+            img = img.unsqueeze(2)  # Add frame dim (B, C, 1, H, W)
+            latent = self.vae.encode(img).latent_dist.sample()
+            # Remove frame and batch dims
+            latent = latent.squeeze(2).squeeze(0)  # (16, h, w)
+            latents.append(latent)
 
-        # AutoencoderKLQwenImage is a video VAE: add a frame dim.
-        images = images.unsqueeze(2)
-        latents = self.vae.encode(images).latent_dist.sample()
+        latents = torch.stack(latents)  # (B, 16, h, w)
 
         latents_mean = (
             torch.tensor(self.vae.config.latents_mean)
@@ -784,7 +788,6 @@ class Krea2Model(BaseModel):
         ).to(latents.device, latents.dtype)
 
         latents = (latents - latents_mean) * latents_std
-        latents = latents.squeeze(2)  # drop frame dim
         return latents.to(device, dtype=dtype)
 
     def decode_latents(self, latents: torch.Tensor, device=None, dtype=None):
@@ -797,7 +800,9 @@ class Krea2Model(BaseModel):
             self.vae.to(device)
 
         latents = latents.to(device, dtype=dtype)
-        latents = latents.unsqueeze(2)  # add frame dim
+        
+        # Add batch dim for VAE (B, C, H, W) -> (B, C, 1, H, W)
+        latents = latents.unsqueeze(2)
 
         latents_mean = (
             torch.tensor(self.vae.config.latents_mean)
@@ -821,7 +826,9 @@ class Krea2Model(BaseModel):
         finally:
             if tiled:
                 self.vae.disable_tiling()
-        images = images.squeeze(2)  # drop frame dim
+        
+        # Remove frame dim, then batch dim
+        images = images.squeeze(2)  # (B, C, H, W)
         return images.to(device, dtype=dtype)
 
     # ------------------------------------------------------------------

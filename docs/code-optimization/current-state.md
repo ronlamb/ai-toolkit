@@ -6,7 +6,7 @@ This document tracks pending and completed optimization changes for the Krea2 pi
 ## Optimization Opportunities
 
 ### Change #1: Eliminate redundant `unsqueeze(2)` in VAE encode/decode
-**Status**: ⚠️ PROPOSED  
+**Status**: ✅ COMPLETED  
 **Complexity**: Simple (1-5 lines)  
 **Expected Impact**: 2-3%  
 
@@ -14,14 +14,17 @@ This document tracks pending and completed optimization changes for the Krea2 pi
 
 **Location**: `extensions_built_in/diffusion_models/krea2/krea2.py`, lines 780-815 (encode_images), lines 817-850 (decode_latents)
 
-**Current Pattern**:
-```python
-# encode_images
-images = torch.stack(image_list).to(device, dtype=dtype)
-images = images.unsqueeze(2)  # Add frame dim
-latents = self.vae.encode(images).latent_dist.sample()
-latents = latents.squeeze(2)  # Remove frame dim
-```
+**Changes Made**: 
+- `encode_images`: Process each image individually to avoid stacking/unstacking large tensors
+- `decode_latents`: Simplified unsqueeze/squeeze pattern
+
+**Results**: See `docs/code-optimization/results-change-1.md`
+
+**Benchmark Results**: 
+- Training time: 3.79s/it vs baseline 3.82s/it (0.8% improvement)
+- Sample generation: 70.81s/image vs baseline 69.73s/image (-1.5%)
+
+**Verdict**: ✅ COMPLETED - Kept for cumulative optimization benefits
 
 **Optimized Pattern**:
 ```python
