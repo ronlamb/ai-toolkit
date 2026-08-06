@@ -278,6 +278,11 @@ class TextFusionBlock(torch.nn.Module):
         self.mlp = SwiGLU(features, multiplier, bias)
 
     def forward(self, x: Tensor, mask: Tensor | None = None) -> Tensor:
+        if torch.is_grad_enabled():
+            return checkpoint(self._forward, x, mask)
+        return self._forward(x, mask)
+
+    def _forward(self, x: Tensor, mask: Tensor | None = None) -> Tensor:
         x = x + self.attn(self.prenorm(x), mask=mask)
         x = x + self.mlp(self.postnorm(x))
 
@@ -312,6 +317,11 @@ class TextFusionTransformer(torch.nn.Module):
         )
 
     def forward(self, x: Tensor, mask: Tensor | None = None) -> Tensor:
+        if torch.is_grad_enabled():
+            return checkpoint(self._forward, x, mask)
+        return self._forward(x, mask)
+
+    def _forward(self, x: Tensor, mask: Tensor | None = None) -> Tensor:
         b, l, n, d = x.shape
         x = x.reshape(b * l, n, d)
         for block in self.layerwise_blocks:
