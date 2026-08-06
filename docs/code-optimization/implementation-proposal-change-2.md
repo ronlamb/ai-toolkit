@@ -1,10 +1,13 @@
 # Implementation Proposal #2: torch.compile for predict_velocity
 
 ## Status
-⚠️ PROPOSED - Awaiting user testing
+⚠️ REVERTED - torch.compile incompatible with this model on Windows
+
+## Issue
+Both `dynamic=True` and `fullgraph=True` approaches caused `OverflowError: Python int too large to convert to C long` during CUDA graph execution on Windows.
 
 ## Complexity
-Moderate (6-10 lines changed)
+Simple (1 line changed)
 
 ## Expected Impact
 5-8% speedup
@@ -97,7 +100,7 @@ def predict_velocity(
 ## Optimized Code
 
 ```python
-@torch.compile(mode="reduce-overhead", dynamic=True)
+@torch.compile(mode="reduce-overhead", fullgraph=True)
 def predict_velocity(
     model: SingleStreamDiT,
     latents: torch.Tensor,  # (B, C, h, w)
@@ -176,15 +179,28 @@ def predict_velocity(
 
 ## Changes Summary
 
-- Added `@torch.compile(mode="reduce-overhead", dynamic=True)` decorator to the function
-- This compiles the function on first call with the given input shapes
-- `dynamic=True` allows the compiled graph to handle varying sequence lengths (important for training with different resolutions)
+- Attempted `@torch.compile(mode="reduce-overhead", fullgraph=True)` decorator
+- Both `dynamic=True` and `fullgraph=True` caused OverflowError on Windows
+
+## Implementation Details
+
+**File Modified**: `extensions_built_in/diffusion_models/krea2/src/pipeline.py`
+
+**Line Changed**: Line 147 (added decorator before function definition)
+
+**Lines of Code Changed**: 1 line added
 
 ## Reasoning
 
 1. **torch.compile** can optimize the computational graph, eliminating Python overhead and fusing operations
 2. **mode="reduce-overhead"** is appropriate for training where we want to minimize compilation overhead
-3. **dynamic=True** is necessary because sequence lengths vary during training (different resolutions, different numbers of reference tokens)
+3. **fullgraph=True** ensures the entire function is compiled without falling back to Python, providing maximum optimization
+
+## Why This Failed
+
+- **OverflowError**: torch.compile generates CUDA kernels with integer parameters that exceed C long limits
+- This is a Windows-specific issue with large tensor dimensions in the MMDiT model
+- Both `dynamic=True` and `fullgraph=True` approaches failed with the same error
 
 ## Validation Protocol
 
@@ -198,6 +214,13 @@ Compare against baseline results in `results-baseline.md`.
 
 - **Training time**: 5-8% improvement (compiled graph eliminates Python overhead)
 - **Sample generation**: 3-5% improvement (faster inference with compiled graph)
+
+## Important Notes
+
+- `torch.compile` is incompatible with this model architecture on Windows
+- The OverflowError occurs during CUDA graph execution with large integer parameters
+- This optimization cannot be applied to this codebase
+- User should proceed to Change #3 for the next optimization opportunity
 
 ## Known Limitations
 

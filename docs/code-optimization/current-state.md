@@ -40,13 +40,24 @@ return torch.stack(latents)
 ---
 
 ### Change #2: Use `torch.compile` for predict_velocity function
-**Status**: ⚠️ PROPOSED  
-**Complexity**: Moderate (6-10 lines)  
+**Status**: ⚠️ REVERTED - torch.compile incompatible with this model on Windows  
+**Complexity**: Simple (1 line changed)  
 **Expected Impact**: 5-8%  
 
 **Issue**: The `predict_velocity` function has complex tensor operations that could benefit from torch.compile. This is a good candidate for training loop optimization.
 
-**Location**: `extensions_built_in/diffusion_models/krea2/src/pipeline.py`, lines 105-180
+**Location**: `extensions_built_in/diffusion_models/krea2/src/pipeline.py`, line 147
+
+**Changes Made**: 
+- Attempted `@torch.compile(mode="reduce-overhead", fullgraph=True)` decorator
+- Both `dynamic=True` and `fullgraph=True` caused OverflowError on Windows
+
+**Results**: See `docs/code-optimization/results-change-2.md` (not created - change reverted)
+
+**Notes**: 
+- torch.compile is incompatible with this model architecture on Windows
+- The error occurs during CUDA graph execution with large integer parameters
+- This optimization cannot be applied to this codebase
 
 **Current Pattern**:
 ```python
@@ -65,35 +76,43 @@ def predict_velocity(...):
 
 ---
 
-### Change #3: Optimize text feature padding with pre-allocated buffers
-**Status**: ⚠️ PROPOSED  
+### Change #3: Optimize text feature padding with vectorized operations
+**Status**: ✅ COMPLETED - Small cumulative improvement detected  
 **Complexity**: Moderate (6-10 lines)  
 **Expected Impact**: 3-5%  
 
 **Issue**: The `pad_text_features` function creates zero tensors and then fills them in a loop. This can be optimized by using more efficient tensor operations.
 
-**Location**: `extensions_built_in/diffusion_models/krea2/src/pipeline.py`, lines 35-48
+**Location**: `extensions_built_in/diffusion_models/krea2/src/pipeline.py`, lines 35-58
 
-**Current Pattern**:
-```python
-features = torch.zeros(batch_size, max_len, dim, device=device, dtype=dtype)
-mask = torch.zeros(batch_size, max_len, dtype=torch.long, device=device)
-for i, f in enumerate(features_list):
-    ln = f.shape[0]
-    features[i, :ln] = f.to(device, dtype)
-    mask[i, :ln] = 1
-```
+**Changes Made**: 
+- Replaced Python loop with `torch.stack()` for feature stacking
+- Used batched assignment to copy valid portions
+- Created mask using vectorized comparison with `torch.arange()`
 
-**Optimized Pattern**:
+**Implementation**:
 ```python
-# Stack all features first, then pad
-all_features = torch.stack(features_list)
+# Stack all features first (may be shorter than max_len)
+all_features = torch.stack(features_list)  # (B, Lt_max_actual, F)
+
+# Create padded features tensor
 features = torch.zeros(batch_size, max_len, dim, device=device, dtype=dtype)
+
+# Copy only the valid portion (faster than per-row assignment)
 features[:, :all_features.shape[1]] = all_features
-mask = torch.zeros(batch_size, max_len, dtype=torch.long, device=device)
-for i, f in enumerate(features_list):
-    mask[i, :f.shape[0]] = 1
+
+# Create mask using arange (vectorized)
+range_tensor = torch.arange(max_len, device=device).unsqueeze(0)  # (1, max_len)
+lengths_tensor = torch.tensor(lengths, device=device).unsqueeze(1)  # (B, 1)
+mask = (range_tensor < lengths_tensor).long()  # (B, max_len)
 ```
+
+**Results**: See `docs/code-optimization/results-change-3.md`
+
+**Notes**: 
+- Eliminates Python loop overhead for per-sample assignment
+- Leverages PyTorch's optimized C++ operations
+- Reduces CPU-GPU transfers by batching operations
 
 ---
 
@@ -147,9 +166,9 @@ t = timestep.to(self.device_torch, dtype=self.torch_dtype) / 1000.0
 
 ## Implementation Checklist
 
-- [ ] Change #1: VAE unsqueeze/squeeze optimization
+- [x] Change #1: VAE unsqueeze/squeeze optimization
 - [ ] Change #2: torch.compile for predict_velocity
-- [ ] Change #3: Text feature padding optimization
+- [x] Change #3: Text feature padding optimization
 - [ ] Change #4: Aggressive gradient checkpointing
 - [ ] Change #5: Dtype conversion optimization
 

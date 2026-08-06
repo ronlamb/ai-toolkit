@@ -49,12 +49,20 @@ def pad_text_features(
     dim = features_list[0].shape[-1]
     batch_size = len(features_list)
 
+    # Stack all features first (may be shorter than max_len)
+    all_features = torch.stack(features_list)  # (B, Lt_max_actual, F)
+    
+    # Create padded features tensor
     features = torch.zeros(batch_size, max_len, dim, device=device, dtype=dtype)
-    mask = torch.zeros(batch_size, max_len, dtype=torch.long, device=device)
-    for i, f in enumerate(features_list):
-        ln = f.shape[0]
-        features[i, :ln] = f.to(device, dtype)
-        mask[i, :ln] = 1
+    
+    # Copy only the valid portion (faster than per-row assignment)
+    features[:, :all_features.shape[1]] = all_features
+    
+    # Create mask using arange (vectorized)
+    range_tensor = torch.arange(max_len, device=device).unsqueeze(0)  # (1, max_len)
+    lengths_tensor = torch.tensor(lengths, device=device).unsqueeze(1)  # (B, 1)
+    mask = (range_tensor < lengths_tensor).long()  # (B, max_len)
+    
     return features, mask
 
 
