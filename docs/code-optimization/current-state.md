@@ -161,7 +161,7 @@ def _forward(self, x: Tensor, mask: Tensor | None = None) -> Tensor:
 ---
 
 ### Change #5: Eliminate redundant dtype conversions in timestep handling
-**Status**: ✅ COMPLETED - 6.5% training improvement, 2.6% sample improvement  
+**Status**: ✅ COMPLETED - 6.6% training improvement, 5.7% sample improvement (full run validation)  
 **Complexity**: Simple (1-5 lines)  
 **Expected Impact**: 2-3%  
 
@@ -182,18 +182,21 @@ t = timestep.to(self.device_torch, dtype=torch.float32) / 1000.0
 t = timestep.to(self.device_torch, dtype=self.torch_dtype) / 1000.0
 ```
 
-**Results**: See `docs/code-optimization/results-change-5.md`
+**Results**: 
+- See `docs/code-optimization/results-change-5.md` (initial 3-epoch test)
+- See `docs/code-optimization/results-change-5-full-run.md` (comprehensive 1032-step validation)
 
 **Benchmark Results**: 
-- Training time: 3.57s/it vs baseline 3.82s/it (**6.5% improvement**)
-- Sample generation: 67.89s/image vs baseline 69.73s/image (**2.6% improvement**)
+- Training time: 3.12s/it vs baseline 3.34s/it (**6.6% improvement**)
+- Sample generation: 66.14s/image vs baseline 70.16s/image (**5.7% improvement**)
 
 **Verdict**: ✅ COMPLETED - Keep for cumulative optimization benefits
 
 **Notes**: 
-- Training time shows consistent improvement across all epochs
-- Sample generation time stabilizes around 65-69 seconds (improved from baseline 67-71s)
-- The dtype optimization is effective and should be kept
+- Full run validation (1032 steps, 54 images) confirms improvement holds at scale
+- Training time shows consistent 6.6% improvement across all checkpoints
+- Sample generation shows tighter variance (65-67s vs 69-71s baseline)
+- The dtype optimization is highly effective and scales well
 
 ## Baseline Metrics
 
