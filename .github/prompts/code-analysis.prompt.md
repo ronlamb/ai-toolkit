@@ -5,6 +5,9 @@ description: 'Analyze codebase processing loop'
 
 Please analyze the processing loop for the given model and identify ways to improve its speed in both the training loop and the image generation loop.
 
+The user will give you the model name being optimized.  If not provided, ask.
+Look for previous code optimizations that are documented in the `docs/code-optimization/archive/<model>/set-N` folders, so you can avoid suggesting optimizations that have already been implemented and tested.
+
 ## Focus Areas
 
 Look for:
@@ -30,6 +33,7 @@ For each optimization opportunity:
    - PROPOSED (if not yet tested)
    - ✅ COMPLETED (if speed improved)
    - ⚠️ REVERTED (if no measurable improvement)
+6. Once all optimizations are complete, the user will move all the change files to the `docs/code-optimization/archive/<model>/set-N` folder.
 
 ## Benchmark Protocol
 
