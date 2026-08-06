@@ -635,7 +635,8 @@ class Krea2Model(BaseModel):
 
         # toolkit timestep (0..1000, 1000 = pure noise) -> Krea flow time t in
         # [0, 1] with t=1 = pure noise. Same convention -> straight divide.
-        t = timestep.to(self.device_torch, dtype=torch.float32) / 1000.0
+        # Use model dtype directly to avoid redundant float32 conversion
+        t = timestep.to(self.device_torch, dtype=self.torch_dtype) / 1000.0
         if t.dim() == 0:
             t = t.unsqueeze(0)
         if t.shape[0] != latent_model_input.shape[0]:

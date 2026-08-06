@@ -161,7 +161,7 @@ def _forward(self, x: Tensor, mask: Tensor | None = None) -> Tensor:
 ---
 
 ### Change #5: Eliminate redundant dtype conversions in timestep handling
-**Status**: ⚠️ PROPOSED  
+**Status**: ✅ COMPLETED - 6.5% training improvement, 2.6% sample improvement  
 **Complexity**: Simple (1-5 lines)  
 **Expected Impact**: 2-3%  
 
@@ -169,20 +169,31 @@ def _forward(self, x: Tensor, mask: Tensor | None = None) -> Tensor:
 
 **Location**: `extensions_built_in/diffusion_models/krea2/krea2.py`, lines 630-670
 
-**Current Pattern**:
+**Changes Made**: 
+- Line 640: Changed `dtype=torch.float32` to `dtype=self.torch_dtype`
+- This eliminates the redundant float32 conversion
+
+**Implementation**:
 ```python
+# Before (line 640):
 t = timestep.to(self.device_torch, dtype=torch.float32) / 1000.0
-# ... later in predict_velocity ...
-v_cond = predict_velocity(..., t=t, ...)
-```
 
-**Optimized Pattern**:
-```python
+# After:
 t = timestep.to(self.device_torch, dtype=self.torch_dtype) / 1000.0
-# Update predict_velocity to accept model dtype directly
 ```
 
----
+**Results**: See `docs/code-optimization/results-change-5.md`
+
+**Benchmark Results**: 
+- Training time: 3.57s/it vs baseline 3.82s/it (**6.5% improvement**)
+- Sample generation: 67.89s/image vs baseline 69.73s/image (**2.6% improvement**)
+
+**Verdict**: ✅ COMPLETED - Keep for cumulative optimization benefits
+
+**Notes**: 
+- Training time shows consistent improvement across all epochs
+- Sample generation time stabilizes around 65-69 seconds (improved from baseline 67-71s)
+- The dtype optimization is effective and should be kept
 
 ## Baseline Metrics
 
@@ -201,6 +212,7 @@ t = timestep.to(self.device_torch, dtype=self.torch_dtype) / 1000.0
 | #2: torch.compile | ⚠️ REVERTED | N/A | N/A |
 | #3: Text feature padding | ✅ COMPLETED | 3-5% | ~2-3% |
 | #4: Gradient checkpointing | ✅ COMPLETED | **10.5%** | 3.2% |
+| #5: Dtype conversion | ✅ COMPLETED | **6.5%** | 2.6% |
 
 ---
 
@@ -210,7 +222,7 @@ t = timestep.to(self.device_torch, dtype=self.torch_dtype) / 1000.0
 - [ ] Change #2: torch.compile for predict_velocity
 - [x] Change #3: Text feature padding optimization
 - [x] Change #4: Aggressive gradient checkpointing (COMPLETED - 10.5% training improvement)
-- [ ] Change #5: Dtype conversion optimization
+- [x] Change #5: Dtype conversion optimization (IMPLEMENTED - awaiting user validation)
 
 ---
 

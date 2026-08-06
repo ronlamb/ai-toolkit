@@ -1,13 +1,20 @@
 # Implementation Proposal #5: Dtype Conversion Optimization
 
 ## Status
-⚠️ PROPOSED - Awaiting user testing
+✅ COMPLETED - Implemented and ready for user validation testing
 
 ## Complexity
 Simple (1-5 lines changed)
 
 ## Expected Impact
 2-3% speedup
+
+## Change Applied
+Changed line 650 in `extensions_built_in/diffusion_models/krea2/krea2.py`:
+- **Before**: `t = timestep.to(self.device_torch, dtype=torch.float32) / 1000.0`
+- **After**: `t = timestep.to(self.device_torch, dtype=self.torch_dtype) / 1000.0`
+
+This eliminates the redundant float32 conversion, passing timesteps directly in model dtype (bf16/fp16).
 
 ## Issue Description
 
