@@ -24,12 +24,18 @@ For each optimization opportunity:
 1. Write the optimized code (≤20 lines)
 2. Run unit tests
 3. Benchmark speed using the benchmark protocol below
+4. Document the change in:
+   - `docs/code-optimization/implementation-proposal-change-N.md` 
+5. Update `docs/code-optimization/current-state.md` to mark the change as 
+   - PROPOSED (if not yet tested)
+   - ✅ COMPLETED (if speed improved)
+   - ⚠️ REVERTED (if no measurable improvement)
 
 ## Benchmark Protocol
 
 ### User's Test
 
-Run 3 epochs of 30 steps each and generate 4 images
+Run 3 (or more) epochs of 30 steps each and generate 4 images
 
 ### Metrics to Collect
 
@@ -37,8 +43,6 @@ Run 3 epochs of 30 steps each and generate 4 images
 2. **Sample generation time**: Time per image from "Generating Samples" progress
 
 ## Validation
-
-For each change, evaluate benchmark results:
 
 - If speed improves → keep the change
 - If speed does not improve → revert the change
@@ -52,20 +56,25 @@ For each change, evaluate benchmark results:
 
 Use the following two files:
 
-- **`docs\implementation-checklist.md`** – Track progress of each change
-- **`docs\results.md`** – Record detailed results for each optimization
+- **`docs/code-optimization/current-state.md`**
+  Tracks pending and completed changes, only.
 
-Update both after each change. 
-Reset them only when starting a new optimization session.
+- **`docs/code-optimization/implementation-proposal-change-N.md`**
+  Contains the detailed proposal, code diff, reasoning and validation for change N.
 
----
+- **Results Files**
+  - `docs/code-optimization/results-baseline.md`
+  - `docs/code-optimization/results-change-N.md`
+
+Each results file contains **only the summarized benchmark results**, not the change description.
 
 ## Test Protocol
 
 Use the benchmark protocol:
-- 3 epochs of 30 steps each 
+- 3 or more epochs of 30 steps each 
 - 4 generated images.
-- User will run this and provide logs.
+
+User will run this and provide logs.
 
 ### Training Time
 
@@ -103,12 +112,15 @@ Summarize results in a table with columns:
 
 ## Baseline Results
 
-Before any change, create a baseline results table using the format in **Summarize Data**.
+Before any change, create:
+- `results-baseline.md`
 
 ## Change Results
 
-After each change, create a new results table (same format) and compare it to:
+After each change, create:
+- `results-change-N.md`
 
+Compare against:
 - the baseline
 - the previous change
 
@@ -118,10 +130,8 @@ Use benchmark results to confirm whether the change improved speed.
 
 ## If There Is Little to No Speed Improvement
 
-If a change shows little or no improvement:
-
-- Propose alternative optimizations for the same area
-- If no viable alternatives exist, revert and move on to a different opportunity
+- Optionally explore small tweaks
+- Then proceed to next optimization
 
 ## If There Are Speed Improvements
 
@@ -138,6 +148,5 @@ If a change improves speed:
 ## Check list
 
 Make sure the user:
-
 - Manually tests each implemented change
 - Commits and pushes changes before starting the next optimization
