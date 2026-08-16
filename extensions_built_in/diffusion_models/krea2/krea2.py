@@ -450,6 +450,7 @@ class Krea2Model(BaseModel):
         self.noise_scheduler = Krea2Model.get_train_scheduler()
 
         self.vae = vae
+        self._cache_vae_norm_constants()
         self.text_encoder = text_encoder
         self.tokenizer = tokenizer
         self.processor = processor
@@ -757,6 +758,31 @@ class Krea2Model(BaseModel):
     # ------------------------------------------------------------------
     # VAE (Qwen-Image AutoencoderKLQwenImage -- same handling as qwen_image arch)
     # ------------------------------------------------------------------
+    def _cache_vae_norm_constants(self):
+        """Build the VAE latent normalization constants once and cache them.
+
+        ``latents_mean`` / ``latents_std`` are fixed per-VAE (16 values for the
+        Qwen-Image VAE) and never change after load.  Building them from Python
+        config lists on every encode/decode caused a CPU→GPU copy each time;
+        cache them as ``(1, z_dim, 1, 1, 1)`` float32 tensors on the VAE device
+        instead and cast to the call dtype at use time.
+        """
+        z = self.vae.config.z_dim
+        mean = (
+            torch.tensor(self.vae.config.latents_mean, dtype=torch.float32)
+            .view(1, z, 1, 1, 1)
+            .to(self.vae_device_torch)
+        )
+        std = (
+            torch.tensor(self.vae.config.latents_std, dtype=torch.float32)
+            .view(1, z, 1, 1, 1)
+            .to(self.vae_device_torch)
+        )
+        # encode uses (x - mean) * (1/std); decode uses x * std + mean.
+        self._vae_latents_mean = mean
+        self._vae_latents_std_inv = 1.0 / std
+        self._vae_latents_std = std
+
     def encode_images(self, image_list: List[torch.Tensor], device=None, dtype=None):
         if device is None:
             device = self.vae_device_torch
@@ -779,16 +805,9 @@ class Krea2Model(BaseModel):
 
         latents = torch.stack(latents)  # (B, 16, h, w)
 
-        latents_mean = (
-            torch.tensor(self.vae.config.latents_mean)
-            .view(1, self.vae.config.z_dim, 1, 1, 1)
-            .to(latents.device, latents.dtype)
-        )
-        latents_std = 1.0 / torch.tensor(self.vae.config.latents_std).view(
-            1, self.vae.config.z_dim, 1, 1, 1
-        ).to(latents.device, latents.dtype)
-
-        latents = (latents - latents_mean) * latents_std
+        mean = self._vae_latents_mean.to(dtype=dtype)
+        std_inv = self._vae_latents_std_inv.to(dtype=dtype)
+        latents = (latents - mean) * std_inv
         return latents.to(device, dtype=dtype)
 
     def decode_latents(self, latents: torch.Tensor, device=None, dtype=None):
@@ -805,17 +824,9 @@ class Krea2Model(BaseModel):
         # Add batch dim for VAE (B, C, H, W) -> (B, C, 1, H, W)
         latents = latents.unsqueeze(2)
 
-        latents_mean = (
-            torch.tensor(self.vae.config.latents_mean)
-            .view(1, self.vae.config.z_dim, 1, 1, 1)
-            .to(latents.device, latents.dtype)
-        )
-        latents_std = (
-            torch.tensor(self.vae.config.latents_std)
-            .view(1, self.vae.config.z_dim, 1, 1, 1)
-            .to(latents.device, latents.dtype)
-        )
-        latents = latents * latents_std + latents_mean
+        mean = self._vae_latents_mean.to(dtype=dtype)
+        std = self._vae_latents_std.to(dtype=dtype)
+        latents = latents * std + mean
 
         # Full-resolution decode spikes VRAM; tile it when low on VRAM (decode
         # only -- encode stays untiled).
