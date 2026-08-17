@@ -161,6 +161,7 @@ def predict_velocity(
     ref_latents: Optional[List[List[torch.Tensor]]] = None,  # per-sample (C, h, w) refs
     isolate_refs: bool = False,
     ref_kv_cache: Optional[dict] = None,
+    fused_context: Optional[torch.Tensor] = None,
 ) -> torch.Tensor:
     """Run the MMDiT on the packed [text | image | refs] sequence.
 
@@ -227,6 +228,7 @@ def predict_velocity(
         ref_kv_cache=(ref_kv_cache["kv"], ref_kv_cache["mask"])
         if reuse_ref_kv
         else None,
+        fused_context=fused_context,
     )
 
     if capture is not None:
@@ -348,6 +350,18 @@ class Krea2Pipeline:
                 unconditional_embeds.text_embeds, device, dtype
             )
 
+        # Pre-fuse the text context once: it is identical across all denoising
+        # steps, so computing txtfusion+txtmlp per step (28x) is pure waste.
+        n = transformer.config.txtlayers
+        def _fuse(feats, tmask):
+            c4 = feats.reshape(
+                feats.shape[0], feats.shape[1], n, feats.shape[-1] // n
+            )
+            return transformer.fuse_context(c4, tmask)
+        fused_cond = _fuse(cond_feats, cond_mask)
+        if do_cfg:
+            fused_uncond = _fuse(uncond_feats, uncond_mask)
+
         # min_res / max_res define the (x1,y1)-(x2,y2) interpolation endpoints for mu.
         align = ae_scale * patch
         x1 = (minres // align) ** 2
@@ -377,6 +391,7 @@ class Krea2Pipeline:
                 ref_latents=ref_latents,
                 isolate_refs=isolate,
                 ref_kv_cache=ref_cache,
+                fused_context=fused_cond,
             )
             if do_cfg:
                 v_uncond = predict_velocity(
@@ -388,6 +403,7 @@ class Krea2Pipeline:
                     ref_latents=ref_latents,
                     isolate_refs=isolate,
                     ref_kv_cache=ref_cache,
+                    fused_context=fused_uncond,
                 )
                 v = v_cond + guidance_scale * (v_cond - v_uncond)
             else:

@@ -71,7 +71,7 @@ This document tracks pending and completed optimization changes for the Krea2 pi
 ---
 
 ### Change #10: Pre-compute text fusion context in sampling loop
-**Status**: ⬜ PROPOSED  
+**Status**: ✅ IMPLEMENTED — Awaiting user benchmark testing  
 **Complexity**: Complex (11-20 lines)  
 **Expected Impact**: 5-8% sample generation speedup  
 

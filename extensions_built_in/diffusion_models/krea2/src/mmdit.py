@@ -477,6 +477,20 @@ class SingleStreamDiT(nn.Module):
     def disable_gradient_checkpointing(self):
         self.gradient_checkpointing = False
 
+    def fuse_context(self, context: Tensor, text_mask: Tensor) -> Tensor:
+        """Pre-compute the fused text context (txtfusion + txtmlp).
+
+        ``context`` is the 4D stacked-layer features ``(B, Lt, n, d)``;
+        ``text_mask`` is the ``(B, Lt)`` key-padding mask (1 for real text
+        tokens). Returns the fused ``(B, Lt, features)`` context. Callers that
+        run many steps with identical text (the 28-step sampling loop) compute
+        this once and pass the result to ``forward`` via ``fused_context`",
+        skipping the per-step txtfusion/txtmlp recompute. Numerically identical
+        to the inline fusion in ``forward`` -- only *when* it runs changes.
+        """
+        txtmask = _mask(text_mask.bool())
+        return self.txtmlp(self.txtfusion(context, mask=txtmask))
+
     def forward(
         self,
         img: Tensor,
@@ -488,15 +502,18 @@ class SingleStreamDiT(nn.Module):
         isolate_refs: bool = False,
         ref_kv_capture: list | None = None,
         ref_kv_cache: tuple[list, Tensor] | None = None,
+        fused_context: Tensor | None = None,
     ) -> Tensor:
         img = self.first(img)
         t = self.tmlp(temb(t, self.config.tdim, device=img.device, dtype=img.dtype))
         tvec = self.tproj(t)
 
-        txtmask = _mask(mask[:, : context.shape[1]])
-
-        context = self.txtfusion(context, mask=txtmask)
-        context = self.txtmlp(context)
+        if fused_context is not None:
+            context = fused_context
+        else:
+            txtmask = _mask(mask[:, : context.shape[1]])
+            context = self.txtfusion(context, mask=txtmask)
+            context = self.txtmlp(context)
 
         txtlen, imglen = context.shape[1], img.shape[1]
         combined = torch.cat((context, img), dim=1)
