@@ -5,9 +5,13 @@ This document tracks pending and completed optimization changes for the Krea2 pi
 
 **Previous set**: See `docs/code-optimization/archive/krea2/set-1/` for changes #1–#5.
 
-**Current best metrics** (after set-1, change #5 full-run validation):
-- Training time: **3.03s/it** (bottom-out)
+**Current best metrics** (after set-1, change #5 full-run validation — 172 training images, 9 samples):
+- Training time: **3.03s/it** (bottom-out from full run)
 - Sample generation: **65.12s/image**
+
+**Benchmark baseline** (6 epochs × 30 steps, 4 images — see `results-baseline-asof-change5.md`):
+- Training time: **3.25s/it** (epoch 6 bottom-out)
+- Sample generation: **65.64s/image** (epoch 6 average)
 
 ## Optimization Opportunities (Set 2)
 
@@ -53,15 +57,16 @@ This document tracks pending and completed optimization changes for the Krea2 pi
 ---
 
 ### Change #9: Single dtype conversion in CFG sampling loop
-**Status**: ⬜ PROPOSED  
+**Status**: ✅ COMPLETED — Neutral impact (kept for code cleanliness)  
 **Complexity**: Simple (1-5 lines)  
 **Expected Impact**: 1-2% sample generation speedup  
+**Actual Result**: No measurable improvement. Samples 65.71s/image vs baseline 65.12s/image (+0.9%, within variance). Kept anyway — zero runtime cost, cleaner code.  
 
 **Issue**: In `Krea2Pipeline.__call__`, when CFG is enabled, `latents.to(dtype)` is called twice per denoising step (once for the conditional pass, once for the unconditional pass). Computing it once and reusing saves a redundant tensor copy per step (28 steps × 1 extra copy eliminated).
 
 **Location**: `extensions_built_in/diffusion_models/krea2/src/pipeline.py`, lines 360-380
 
-**Details**: See `implementation-proposal-change-9.md`
+**Details**: See `implementation-proposal-change-9.md` and `results-change-9.md`
 
 ---
 

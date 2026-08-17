@@ -367,9 +367,10 @@ class Krea2Pipeline:
         # Euler integration of the flow ODE (with optional CFG).
         for tcurr, tprev in zip(ts[:-1], ts[1:]):
             t = torch.full((latents.shape[0],), tcurr, dtype=dtype, device=device)
+            lat_d = latents.to(dtype)  # cast once; shared by cond + uncond passes
             v_cond = predict_velocity(
                 transformer,
-                latents.to(dtype),
+                lat_d,
                 t,
                 cond_feats,
                 cond_mask,
@@ -380,7 +381,7 @@ class Krea2Pipeline:
             if do_cfg:
                 v_uncond = predict_velocity(
                     transformer,
-                    latents.to(dtype),
+                    lat_d,
                     t,
                     uncond_feats,
                     uncond_mask,
