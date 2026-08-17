@@ -25,9 +25,10 @@ This document tracks pending and completed optimization changes for the Krea2 pi
 ---
 
 ### Change #7: Cache position grid and mask in `prepare()`
-**Status**: ⬜ PROPOSED  
+**Status**: ⚠️ REVERTED — No measurable improvement, training slower  
 **Complexity**: Moderate (6-10 lines)  
 **Expected Impact**: 2-4% (both training and sampling)  
+**Actual Result**: Training 3.53s/it (+8.6% vs baseline), Samples 67.81s/image (+0.1% vs baseline). Reverted.  
 
 **Issue**: The `prepare()` function creates the image position grid (`imgids`), text positions (all zeros), and image mask on every call. For a fixed resolution, these tensors are identical across all steps. In the sampling loop (28 steps), this means 28 redundant allocations of the same position/mask tensors. Caching them per `(h_, w_, txtlen, b)` eliminates ~5 tensor allocations and a `repeat` operation every step.
 
@@ -38,11 +39,12 @@ This document tracks pending and completed optimization changes for the Krea2 pi
 ---
 
 ### Change #8: Cache RoPE frequencies for fixed positions
-**Status**: ⬜ PROPOSED  
+**Status**: ⚠️ REVERTED — Cannot work without Change #7; shape-based key produces wrong results  
 **Complexity**: Moderate (6-10 lines)  
 **Expected Impact**: 3-5% (both training and sampling)  
+**Actual Result**: Corrupted output. Shape-based cache key `(tuple(pos.shape), pos.device)` is unsafe — different aspect ratios (e.g., 512×1024 vs 1024×512) produce the same `pos.shape` but different position values, returning wrong RoPE frequencies. Original proposal correctly required Change #7's stable `data_ptr()` identity. Without it, no safe cache key exists.  
 
-**Issue**: `freqs = self.posemb(pos)` computes RoPE frequencies (einsum + cos/sin over the full sequence length ~4600 tokens) on every forward pass. Since `pos` is constant per resolution (see Change #7), the resulting `freqs` tensor is also constant. In the 28-step sampling loop, this is a non-trivial computation repeated 28 times with identical input. Caching it keyed on the position tensor's data pointer skips redundant work.
+**Issue**: `freqs = self.posemb(pos)` computes RoPE frequencies on every forward pass. Caching requires a safe key that uniquely identifies position content.
 
 **Location**: `extensions_built_in/diffusion_models/krea2/src/mmdit.py`, `SingleStreamDiT.forward` (~line 570)
 
