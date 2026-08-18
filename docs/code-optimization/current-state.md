@@ -172,6 +172,92 @@ This document tracks pending and completed optimization changes for the Krea2 pi
 
 **Details**: See `implementation-proposal-change-10.md` and `results-change-10.md`
 
+## Optimization Opportunities (Set 3 — full training-loop audit)
+
+Full pass over the entire per-step training path: `SDTrainer.train_single_accumulation`
+→ `BaseSDTrainProcess.process_general_training_batch` → `predict_noise` /
+`get_noise_prediction` (krea2.py) → `pad_text_features` + `prepare` +
+`predict_velocity` (pipeline.py) → `SingleStreamDiT.forward` (mmdit.py).
+Focus: excess copies, wasted number conversions, CUDA-simplifiable math.
+
+### Change #11: Vectorize `BaseModel.add_noise` (kill per-sample chunk loop)
+**Status**: 📝 PROPOSED — awaiting approval  
+**Complexity**: Simple (1-5 lines)  
+**Expected Impact**: ~0.5–2% training speedup  
+
+**Issue**: `BaseModel.add_noise` (base_model.py ~line 750) chunks the batch into
+B single-sample slices, calls `noise_scheduler.add_noise` B times in a Python loop,
+then `torch.cat`s the full (B, 16, h, w) latent tensor back together — every
+training step. For the flow-matching scheduler (Krea2's), `add_noise` is a single
+affine blend `(1-t)*x + t*noise` that broadcasts per-sample `(B,)` timesteps
+correctly over the whole batch, so one call replaces B calls + 1 full copy. The
+chunk loop is kept as fallback for schedulers that need per-sample calls.
+
+**Location**: `toolkit/models/base_model.py`, `BaseModel.add_noise`
+
+**Details**: See `implementation-proposal-change-11.md`
+
+---
+
+### Change #12: RoPE in float32 with cached omega (drop per-call float64 rebuild)
+**Status**: 📝 PROPOSED — awaiting approval  
+**Complexity**: Simple (~15 lines across `rope` + `PositionalEncoding`)  
+**Expected Impact**: ~0.1–0.5% training speedup  
+
+**Issue**: `posemb(pos)` runs 3× `rope()` per forward, each rebuilding
+`scale`/`omega` (arange + pow) **in float64** and running `einsum`+`cos`/`sin`
+**in float64** over (B, L, d/2), then downcasting with `.float()`. Float64 trig
+has no fast GPU path and the precision is wasted: `pos` holds small integers, the
+model runs bf16 (rel. error ~4e-3), and `ropeapply` consumes the freqs in a bf16
+multiply. Fix: cache `omega` as a plain (non-buffer, meta-safe) attribute built
+lazily on first forward; compute in float32. `rope` is module-private (only caller
+is `PositionalEncoding.forward`).
+
+**Location**: `extensions_built_in/diffusion_models/krea2/src/mmdit.py`, `rope` (line 31) + `PositionalEncoding` (line 136)
+
+**Details**: See `implementation-proposal-change-12.md`
+
+---
+
+### Change #13: Cache `temb` frequency vector + drop redundant `.to()` in `encode_images`
+**Status**: 📝 PROPOSED — awaiting approval  
+**Complexity**: Simple (1–5 lines each, two independent micro-opts)  
+**Expected Impact**: ~0.1% training speedup combined  
+
+**Issue A**: `temb()` rebuilds a constant 128-value frequency vector
+(`torch.exp(arange)`) on every forward. Cache it in a module-level dict keyed by
+`(dim, device)` (meta-safe; `temb` is a free function with no module state).
+
+**Issue B**: `Krea2Model.encode_images` ends with
+`return latents.to(device, dtype=dtype)` — a no-op copy of the full (B, 16, h, w)
+latent batch: each image was already moved to `device`/`dtype` before VAE encode,
+so the stacked result is already in place. Remove it.
+
+**Location**: `mmdit.py` `temb` (~line 74) + `krea2.py` `encode_images` (~line 810)
+
+**Details**: See `implementation-proposal-change-13.md`
+
+---
+
+### Audited and rejected (no change proposed)
+- **`prepare()` per-step grid/mask rebuild** — already rejected in set-2 (Change #7
+  reverted: +8.6% training). The ~5 small tensor allocations are not worth the
+  cache-key complexity; `pos`/`mask` are tiny vs the (B, L, 6144) activations.
+- **`pad_text_features`** — already optimized in set-1 (Change #3); current
+  stack+slice version is fine.
+- **`predict_noise` `latents.to(self.device_torch)` / `timestep.to(...)`** —
+  no-ops when already on device (the normal case); `.to()` with matching
+  device/dtype returns the same tensor without a copy. Not worth touching shared code.
+- **`calculate_loss` `pred.float()` / `target.float()`** — intentional fp32 MSE
+  accumulation for bf16 training; removing it would hurt precision. Kept.
+- **`get_noise_prediction` `latent_model_input.to(device, dtype)`** — no-op in the
+  normal case (latents already on device/dtype from `process_general_training_batch`).
+- **Text encoder re-encode per step** — only happens when the dataset does NOT set
+  `cache_text_embeddings: true` (see `BaseSDTrainProcess.is_caching_text_embeddings`).
+  If the user's dataset config has it off, enabling it is a **config change** (no
+  code) that would be the single biggest per-step win available — worth checking,
+  but out of scope for code edits.
+
 ## Testing Protocol
 
 For each change:
