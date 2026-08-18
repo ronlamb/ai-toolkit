@@ -58,19 +58,20 @@ Run 3 (or more) epochs of 30 steps each and generate 4 images
 
 ## State files
 
-Use the following two files:
+Use **`docs/code-optimization/current-state.md`** as the single source of truth. This file contains:
+- All pending and completed changes with status
+- Current best metrics (training time, sample generation)
+- Full benchmark results (training time per step, sample generation per checkpoint)
+- Comparison tables (vs previous sets, vs original baseline)
+- Baseline variation analysis
 
-- **`docs/code-optimization/current-state.md`**
-  Tracks pending and completed changes, only.
+When starting a new set of optimizations:
+1. Read `current-state.md` to understand the current state and metrics
+2. Add new changes to `current-state.md` as they are proposed
+3. Update status and actual results in `current-state.md` after testing
+4. Create detailed implementation proposals in `docs/code-optimization/implementation-proposal-change-N.md`
 
-- **`docs/code-optimization/implementation-proposal-change-N.md`**
-  Contains the detailed proposal, code diff, reasoning and validation for change N.
-
-- **Results Files**
-  - `docs/code-optimization/results-baseline.md`
-  - `docs/code-optimization/results-change-N.md`
-
-Each results file contains **only the summarized benchmark results**, not the change description.
+**Do not create separate results files.** All benchmark data should be recorded in `current-state.md`.
 
 ## Test Protocol
 
@@ -114,19 +115,28 @@ Summarize results in a table with columns:
 - sample 3 time
 - sample 4 time
 
-## Baseline Results
+## Recording Results
 
-Before any change, create:
-- `results-baseline.md`
+All benchmark results go into **`docs/code-optimization/current-state.md`**.
 
-## Change Results
+### Baseline Results
 
-After each change, create:
-- `results-change-N.md`
+Before any change, record baseline metrics in `current-state.md`:
+- Training time per epoch
+- Sample generation times
+- Stable/bottom-out metrics
+
+### Change Results
+
+After each change, update `current-state.md` with:
+- New benchmark data
+- Comparison against baseline and previous change
+- Status (✅ COMPLETED or ⚠️ REVERTED)
+- Actual results summary
 
 Compare against:
-- the baseline
-- the previous change
+- The baseline (original unoptimized metrics)
+- The previous change
 
 ## Validate Each Test
 
