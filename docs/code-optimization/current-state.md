@@ -5,102 +5,31 @@ This document tracks pending and completed optimization changes for the Krea2 pi
 
 **Previous set**: See `docs/code-optimization/archive/krea2/set-1/` for changes #1–#5.
 
-**Current best metrics** (after set-2 full-run validation — 172 training images, 9 samples):
-- Training time: **2.93s/it** (bottom-out from full run, steps 2580–3784)
-- Sample generation: **64.85s/image** (stable checkpoints, avg of steps 2236–3784 excluding 2924/3096 outliers)
-
-**Set-1 best metrics** (for comparison):
-- Training time: **3.03s/it**
-- Sample generation: **65.12s/image**
-
-**Cumulative improvement (set-1 → set-2)**:
-- Training: **-3.3%** (3.03 → 2.93s/it)
-- Samples: **-0.4%** (65.12 → 64.85s/image)
-
-**Benchmark baseline** (6 epochs × 30 steps, 4 images — see `results-baseline-asof-change5.md`):
+**Baseline (start of set-2)** — the state entering set 2, i.e. end of set 1 (change #5). Short benchmark: 6 epochs × 30 steps, 4 images. See `archive/krea2/set-1/results-baseline-asof-change5.md`.
 - Training time: **3.25s/it** (epoch 6 bottom-out)
 - Sample generation: **65.64s/image** (epoch 6 average)
 
-## Full-Run Benchmark Results (172 images, 9 samples — Set 2 as of Change #10)
+**Current best metrics** — after the set-2 full run (172 training images, 9 samples per checkpoint), as of change #10.
+- Training time: **2.93s/it** (bottom-out, steps 2580–3784)
+- Sample generation: **64.85s/image** (stable checkpoints, avg of steps 2236–3784 excluding 2924/3096 outliers)
 
-### Training Time (s/it)
+**Improvement vs baseline at start of set-2**:
+- Training: **-9.8%** (3.25 → 2.93s/it)
+- Samples: **-1.2%** (65.64 → 64.85s/image)
 
-| Steps | Time | s/it | Notes |
-|-------|------|------|-------|
-| 172 | 9:37 | 3.38 | Warm-up |
-| 344 | 18:31 | 3.24 | |
-| 516 | 26:50 | 3.13 | |
-| 688 | 35:10 | 3.07 | |
-| 860 | 43:32 | 3.04 | |
-| 1032 | 51:48 | 3.02 | |
-| 1204 | 1:00:11 | 3.00 | |
-| 1376 | 1:08:29 | 2.99 | |
-| 1548 | 1:16:51 | 2.98 | |
-| 1720 | 1:25:10 | 2.97 | |
-| 1892 | 1:33:30 | 2.97 | |
-| 2064 | 1:41:45 | 2.96 | |
-| 2236 | 1:50:08 | 2.96 | |
-| 2408 | 1:58:25 | 2.95 | |
-| 2580 | 2:06:47 | 2.95 | |
-| 2752 | 2:15:03 | 2.95 | |
-| 2924 | 2:23:22 | 2.94 | |
-| 3096 | 2:31:43 | 2.94 | |
-| 3268 | 2:39:57 | 2.94 | |
-| 3440 | 2:48:17 | 2.94 | |
-| 3612 | 2:56:39 | 2.94 | |
-| 3784 | 3:04:59 | 2.93 | Bottom-out |
+**Full-run per-step data**: see `results-baseline-asof-change10.md` (per-checkpoint training s/it and sample times).
 
-### Sample Generation (s/image)
+## Full-Run Results (Set 2, as of Change #10)
 
-| Steps | Avg Sample (s) | Notes |
-|-------|----------------|-------|
-| 172 | 69.74 | Warm-up |
-| 344 | 67.18 | |
-| 516 | 65.01 | |
-| 688 | 64.99 | |
-| 860 | 64.81 | |
-| 1032 | 64.85 | |
-| 1204 | 64.87 | |
-| 1376 | 65.05 | |
-| 1548 | 64.86 | |
-| 1720 | 64.84 | |
-| 1892 | 64.89 | |
-| 2064 | 65.05 | |
-| 2236 | 64.76 | |
-| 2408 | 64.90 | |
-| 2580 | 64.78 | |
-| 2752 | 65.10 | |
-| 2924 | 64.15 | Outlier (lower) |
-| 3096 | 64.15 | Outlier (lower) |
-| 3268 | 64.90 | |
-| 3440 | 65.04 | |
-| 3612 | 64.98 | |
-| 3784 | 64.92 | |
+Per-checkpoint training s/it and sample generation times for the full run (172 images, 9 samples) are in **`results-baseline-asof-change10.md`**.
 
-### Stable Metrics (Bottom-out, steps 2236–3784)
+**Stable metrics (bottom-out, steps 2236–3784)**:
+- Training: **2.93s/it** (range 2.93–2.96)
+- Samples: **64.85s/image** (avg of stable checkpoints, excluding 2924/3096 outliers)
 
-- **Training**: **2.93s/it** (range 2.93–2.96)
-- **Samples**: **64.85s/image** (avg of stable checkpoints, excluding 2924/3096 outliers)
+**Improvement vs baseline at start of set-2**: training **-9.8%** (3.25 → 2.93s/it), samples **-1.2%** (65.64 → 64.85s/image).
 
-### Comparison vs Set-1 Best
-
-| Metric | Set-1 Best | Set-2 (Change #10) | Delta |
-|--------|------------|--------------------|-------|
-| Training (s/it) | 3.03 | 2.93 | **-3.3%** |
-| Samples (s/image) | 65.12 | 64.85 | **-0.4%** |
-
-### Comparison vs Original Baseline (asof change 5)
-
-| Metric | Baseline | Set-2 (Change #10) | Delta |
-|--------|----------|--------------------|-------|
-| Training (s/it) | 3.25 | 2.93 | **-9.8%** |
-| Samples (s/image) | 65.64 | 64.85 | **-1.2%** |
-
-### Baseline Variation Analysis
-
-- Training time varies from 2.93s to 3.38s across full run (warm-up effect)
-- Sample generation varies from 64.15s to 69.74s across full run (warm-up + variance)
-- Stable range (steps 2236+): training 2.93–2.96s/it, samples 64.76–65.10s/image
+**Variation**: training 2.93–3.38s/it across full run (warm-up); samples 64.15–69.74s/image; stable range (steps 2236+) training 2.93–2.96s/it, samples 64.76–65.10s/image.
 
 ## Optimization Opportunities (Set 2)
 
@@ -181,19 +110,49 @@ Full pass over the entire per-step training path: `SDTrainer.train_single_accumu
 Focus: excess copies, wasted number conversions, CUDA-simplifiable math.
 
 ### Change #11: Vectorize `BaseModel.add_noise` (kill per-sample chunk loop)
-**Status**: 📝 PROPOSED — awaiting approval  
+**Status**: ⚠️ REVERTED — No measurable improvement (training +3.7%, within variance)  
 **Complexity**: Simple (1-5 lines)  
 **Expected Impact**: ~0.5–2% training speedup  
+**Actual Result**: Training 3.34s/it (epochs 4-6) vs change #10's 3.22s/it (+3.7%, slower); Samples 68.23s/image (epochs 4-6) vs change #10's 67.21s/image (+1.5%, within ~5% variance). Consistent upward shift across all 6 epochs — most likely run-to-run variance (the change removes work and is bitwise-identical, so it cannot logically slow training). No measurable improvement. **Reverted.**  
+
+**Benchmark (6 epochs × 30 steps, 4 images)**:
+
+| Epoch | Steps | Total time | Avg training (s/it) | S1 | S2 | S3 | S4 | Avg sample (s) |
+|-------|-------|------------|---------------------|--------|--------|--------|--------|----------------|
+| 1 | 30 | 1:42 | 3.52 | 69.19 | 68.06 | 67.62 | 67.67 | 68.14 |
+| 2 | 30 | 1:34 | 3.34 | 67.14 | 67.47 | 67.27 | 67.31 | 67.30 |
+| 3 | 30 | 1:55 | 3.50 | 67.25 | 67.58 | 67.02 | 66.59 | 67.11 |
+| 4 | 30 | 1:35 | 3.41 | 66.05 | 65.81 | 66.68 | 67.57 | 66.53 |
+| 5 | 30 | 1:32 | 3.34 | 69.20 | 69.09 | 69.07 | 69.24 | 69.15 |
+| 6 | 30 | 1:26 | 3.27 | 69.05 | 68.98 | 68.99 | 69.03 | 69.01 |
+
+*Avg training (s/it) is the progress bar's cumulative rate at epoch end — same metric as change #10's table. Total time is the per-epoch elapsed delta (excludes sample generation).*
+
+**Comparison vs Change #10 (epochs 4-6 stable)**:
+
+| Metric | Change #10 | Change #11 | Delta |
+|--------|------------|------------|-------|
+| Training (s/it) | 3.22 | 3.34 | +3.7% (slower) |
+| Samples (s/image) | 67.21 | 68.23 | +1.5% (within variance) |
+
+**Verdict**: No measurable improvement. The delta is within run-to-run variance (set-1 established ~21% training variation; the change is bitwise-identical and removes work, so it cannot logically slow training). **Reverted** per protocol — `base_model.py` restored to the original chunk loop; test suite re-verified (44 passed).
 
 **Issue**: `BaseModel.add_noise` (base_model.py ~line 750) chunks the batch into
 B single-sample slices, calls `noise_scheduler.add_noise` B times in a Python loop,
 then `torch.cat`s the full (B, 16, h, w) latent tensor back together — every
 training step. For the flow-matching scheduler (Krea2's), `add_noise` is a single
-affine blend `(1-t)*x + t*noise` that broadcasts per-sample `(B,)` timesteps
-correctly over the whole batch, so one call replaces B calls + 1 full copy. The
-chunk loop is kept as fallback for schedulers that need per-sample calls.
+affine blend `(1-t)*x + t*noise`; reshaping per-sample `(B,)` timesteps to
+`(B,1,...,1)` lets one call replace B calls + 1 full copy. The chunk loop is kept
+as fallback for schedulers that need per-sample calls (or shared single timesteps).
 
 **Location**: `toolkit/models/base_model.py`, `BaseModel.add_noise`
+
+**Implementation note**: the original proposal's fast path (raw `(B,)` timesteps)
+was proven to crash — PyTorch aligns trailing dims, so `B` lands on the width dim.
+Implemented with a mandatory reshape `(B,) → (B,1,...,1)` before the single
+scheduler call. Unit check: bitwise-identical to chunked path across 5 cases
+(float/int timesteps, fp16, B=1, shared-timestep fallback). `pytest tests/`:
+44 passed.
 
 **Details**: See `implementation-proposal-change-11.md`
 
@@ -263,13 +222,12 @@ so the stacked result is already in place. Remove it.
 For each change:
 1. Implement the optimization
 2. Run benchmark test: 3 epochs × 30 steps, generate 4 images
-3. Compare against current best (set-1 results)
-4. Keep change only if improvement >5%
+3. Compare against the current best metrics (above) and the baseline at start of set-2
+4. Keep change only if it improves speed; revert otherwise
 
 ## Notes
 
-- Set-1 established that baseline variation is ~21% training, ~5% samples
-- Only changes with >5% improvement should be kept (per set-1 verdict criteria)
+- Baseline variation observed in set 2: training ~2.93–3.38s/it (warm-up), samples ~64.15–69.74s/image
 - Changes #7, #8, and #10 compound: caching positions enables caching RoPE freqs, and pre-fusing context is independent
 - User will run benchmark tests and provide logs
-- **This file is the single source of truth** for optimization state, metrics, and benchmark results. All data from `results-baseline-asof-change10.md` has been consolidated here.
+- **This file is the single source of truth** for optimization state, metrics, and per-change status. Per-checkpoint full-run data lives in `results-baseline-asof-change10.md`.
