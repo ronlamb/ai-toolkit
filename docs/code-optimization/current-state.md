@@ -159,7 +159,7 @@ scheduler call. Unit check: bitwise-identical to chunked path across 5 cases
 ---
 
 ### Change #12: RoPE in float32 with cached omega (drop per-call float64 rebuild)
-**Status**: 📝 PROPOSED — awaiting approval  
+**Status**: ⚠️ REVERTED — No measurable improvement (training +3.4%, within variance)  
 **Complexity**: Simple (~15 lines across `rope` + `PositionalEncoding`)  
 **Expected Impact**: ~0.1–0.5% training speedup  
 
@@ -173,6 +173,35 @@ lazily on first forward; compute in float32. `rope` is module-private (only call
 is `PositionalEncoding.forward`).
 
 **Location**: `extensions_built_in/diffusion_models/krea2/src/mmdit.py`, `rope` (line 31) + `PositionalEncoding` (line 136)
+
+**Implementation note**: Unit check passed — max abs diff old (fp64) vs new
+(fp32 cached omega) = 3.95e-06 across 5 random integer-position trials
+(< 1e-5 revert threshold). `state_dict()` stays empty (plain attribute, not a
+buffer — required because the transformer is built on `torch.device("meta")`
+and loaded with `strict=True`). Meta construction verified. `pytest tests/`:
+44 passed.
+
+**Benchmark (6 epochs × 30 steps, 4 images)**:
+
+| Epoch | Steps | Total time | Avg training (s/it) | S1 | S2 | S3 | S4 | Avg sample (s) |
+|-------|-------|------------|---------------------|--------|--------|--------|--------|----------------|
+| 1 | 30 | 1:50 | 3.81 | 68.54 | 67.71 | 67.44 | 67.34 | 67.76 |
+| 2 | 30 | 1:45 | 3.65 | 67.30 | 67.35 | 67.27 | 67.25 | 67.29 |
+| 3 | 30 | 1:33 | 3.47 | 67.36 | 67.25 | 67.23 | 67.19 | 67.26 |
+| 4 | 30 | 1:37 | 3.41 | 67.30 | 67.24 | 67.22 | 67.19 | 67.24 |
+| 5 | 30 | 1:29 | 3.32 | 67.28 | 67.23 | 67.19 | 67.18 | 67.22 |
+| 6 | 30 | 1:29 | 3.26 | 67.34 | 67.20 | 67.29 | 66.08 | 66.98 |
+
+*Avg training (s/it) is the progress bar's cumulative rate at epoch end — same metric as change #10/#11 tables. Total time is the per-epoch elapsed delta (excludes sample generation).*
+
+**Comparison vs Change #10 (epochs 4-6 stable)**:
+
+| Metric | Change #10 | Change #12 | Delta |
+|--------|------------|------------|-------|
+| Training (s/it) | 3.22 | 3.33 | +3.4% (slower) |
+| Samples (s/image) | 67.21 | 67.15 | −0.1% (flat) |
+
+**Verdict**: No measurable improvement. Training delta is within run-to-run variance (the change strictly removes work — fp64 trig → fp32, cached omega — so it cannot logically slow training). Samples flat. **Reverted** per protocol — `mmdit.py` restored to the original float64 `rope`; test suite re-verified (44 passed).
 
 **Details**: See `implementation-proposal-change-12.md`
 

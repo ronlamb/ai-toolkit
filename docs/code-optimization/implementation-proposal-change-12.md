@@ -1,7 +1,21 @@
 # Implementation Proposal #12: RoPE in float32 with cached omega (drop per-call float64 rebuild)
 
 ## Status
-📝 PROPOSED — awaiting approval
+⚠️ REVERTED — No measurable improvement (training +3.4% vs change #10, within
+run-to-run variance; samples flat at −0.1%). Code restored to original float64
+`rope`; 44/44 tests re-verified after revert.
+
+**Unit check result (pre-revert)**: max abs diff old (fp64) vs new
+(fp32 cached omega) = **3.95e-06** across 5 random integer-position trials
+(b∈1–3, n∈1–3, pos<128) — well under the 1e-5 revert threshold.
+`state_dict()` stays empty (no new buffers), meta-device construction verified
+safe, output dtype float32.
+
+**Benchmark result (6 epochs × 30 steps, 4 images)**: training 3.26–3.81 s/it
+(bottom-out 3.26, cumulative-rate metric), samples 66.98–67.76 s/image
+(epochs 4-6 avg 67.15). Vs change #10 stable (3.22 s/it, 67.21 s/image):
+training +3.4% (variance — the change removes work, cannot logically slow),
+samples −0.1% (flat). Full table in `current-state.md`.
 
 ## Complexity
 Simple (~15 lines across `rope` + `PositionalEncoding`)
