@@ -1,7 +1,20 @@
 # Implementation Proposal #13: Cache `temb` frequency vector + drop redundant `.to()` in `encode_images`
 
 ## Status
-📝 PROPOSED — awaiting approval (two independent micro-opts, each ≤ 5 lines)
+⚠️ REVERTED — Slower bottom-out (3.16 vs 3.02 s/it), flat total times, no end-of-run improvement
+
+**Benchmark summary**: 6 epochs × 30 steps, 4 images. Training bottom-out 3.16 s/it
+vs current best's 3.02 s/it (+4.6%); samples ~69.5s/image (1024-mix epochs) vs
+~67.2s baseline (+3.4%). Dataset mixes 512×512 + 1024×1024 sets, so absolute
+sample times shift with the mix. Full table in `current-state.md`.
+
+**Implementation notes**:
+- Part A: cache key is `(dim, period, device)` (added `period` vs. the original
+  proposal's `(dim, device)`) so a non-default `period` can't silently return wrong
+  freqs. Unit check: cached `temb` is bitwise-identical (`torch.equal`) to the
+  original across dim ∈ {256, 1024}, B ∈ {1, 3, 8}, dtype ∈ {fp32, bf16};
+  `period=1e3` does not collide with the cached default.
+- Part B: no-op removal (identical values). `pytest tests/`: 44 passed.
 
 ## Complexity
 Simple (1–5 lines each)

@@ -208,20 +208,52 @@ and loaded with `strict=True`). Meta construction verified. `pytest tests/`:
 ---
 
 ### Change #13: Cache `temb` frequency vector + drop redundant `.to()` in `encode_images`
-**Status**: 📝 PROPOSED — awaiting approval  
+**Status**: ⚠️ REVERTED — Slower bottom-out (3.16 vs 3.02 s/it)  
 **Complexity**: Simple (1–5 lines each, two independent micro-opts)  
 **Expected Impact**: ~0.1% training speedup combined  
 
 **Issue A**: `temb()` rebuilds a constant 128-value frequency vector
 (`torch.exp(arange)`) on every forward. Cache it in a module-level dict keyed by
-`(dim, device)` (meta-safe; `temb` is a free function with no module state).
+`(dim, period, device)` (meta-safe; `temb` is a free function with no module state).
+`period` is included in the key so a non-default period can't silently return wrong freqs.
 
-**Issue B**: `Krea2Model.encode_images` ends with
+**Issue B**: `Krea2Model.encode_images` ended with
 `return latents.to(device, dtype=dtype)` — a no-op copy of the full (B, 16, h, w)
 latent batch: each image was already moved to `device`/`dtype` before VAE encode,
-so the stacked result is already in place. Remove it.
+so the stacked result is already in place. Removed (returns `latents` directly).
 
 **Location**: `mmdit.py` `temb` (~line 74) + `krea2.py` `encode_images` (~line 810)
+
+**Implementation note**: Part A unit check passed — cached `temb` is
+bitwise-identical (`torch.equal`) to the original across dim ∈ {256, 1024},
+B ∈ {1, 3, 8}, dtype ∈ {fp32, bf16}; non-default `period=1e3` does not collide
+with the cached default. Part B is a no-op removal (identical values). `pytest tests/`:
+44 passed.
+
+**Benchmark (6 epochs × 30 steps, 4 images)**:
+
+| Epoch | Steps | Total time | Avg training (s/it) | S1 | S2 | S3 | S4 | Avg sample (s) |
+|-------|-------|------------|---------------------|--------|--------|--------|--------|----------------|
+| 1 | 30 | 1:59 | 4.12 | 70.62 | 70.00 | 69.79 | 69.77 | 70.05 |
+| 2 | 30 | 1:42 | 3.76 | 69.58 | 69.58 | 69.56 | 69.55 | 69.57 |
+| 3 | 30 | 1:35 | 3.56 | 69.57 | 69.51 | 69.50 | 69.49 | 69.52 |
+| 4 | 30 | 1:39 | 3.49 | 69.65 | 69.57 | 69.51 | 69.50 | 69.56 |
+| 5 | 30 | 1:44 | 3.49 | 69.61 | 69.60 | 69.57 | 69.07 | 69.46 |
+| 6 | 30 | 1:21 | 3.36 | 64.31 | 64.22 | 64.19 | 64.17 | 64.22 |
+
+*Avg training (s/it) is the progress bar's cumulative rate at epoch end. Total time is the per-epoch elapsed delta (excludes sample generation). Note: this dataset mixes 512×512 and 1024×1024 image sets, so sample times shift with the mix (epoch 6's ~64s reflects a lighter-resolution batch, not an improvement).*
+
+**Comparison vs current best (change #10 state)**:
+
+| Metric | Current best (#10) | Change #13 | Delta |
+|--------|--------------------|------------|-------|
+| Training bottom-out (s/it) | 3.02 | 3.16 | +4.6% (slower) |
+| Samples (s/image, 1024-mix epochs) | ~67.2 | ~69.5 | +3.4% (slower) |
+
+**Verdict**: Slower bottom-out (3.16 vs 3.02 s/it) with flat total times and no
+end-of-run improvement — **reverted** per protocol. `mmdit.py` restored to the
+original per-call `temb` freqs; `krea2.py` restored to the original
+`return latents.to(device, dtype=dtype)`. Test suite re-verified (44 passed).
 
 **Details**: See `implementation-proposal-change-13.md`
 

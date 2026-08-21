@@ -32,7 +32,8 @@ For each optimization opportunity:
 5. Update `docs/code-optimization/current-state.md` to mark the change as 
    - PROPOSED (if not yet tested)
    - ✅ COMPLETED (if speed improved)
-   - ⚠️ REVERTED (if no measurable improvement)
+   - ⚠️ REVERTED (if no measurable improvement or slower)
+   - 🤔 USER DECISION (if results are negligible — see Validation below; do not decide unilaterally)
 6. Once all optimizations are complete, the user will move all the change files to the `docs/code-optimization/archive/<model>/set-N` folder.
 
 ## Benchmark Protocol
@@ -49,7 +50,21 @@ Run 3 (or more) epochs of 30 steps each and generate 4 images
 ## Validation
 
 - If speed improves → keep the change
-- If speed does not improve → revert the change
+- If speed does not improve (slower) → revert the change
+- **If results are basically negligible** (within run-to-run variance, e.g. ±1–2%
+  on the bottom-out metric) → **let the user decide** whether to keep or revert.
+  Present the data (bottom-out s/it, sample times, variance context) and ask;
+  do not keep or revert unilaterally.
+
+### How to read the metrics (important)
+- The progress bar's `s/it` is a **cumulative average since training started**,
+  not the rate of the current epoch. Early warm-up steps drag it up, so compare
+  **bottom-out (minimum) values** between runs, not early-epoch numbers.
+- A change is only "faster" if its bottom-out s/it (and/or sample times) are
+  lower than the current best's bottom-out. Small end-of-run slices of
+  improvement do not count if overall total time and start/end times are flat.
+- Mixed-resolution datasets (e.g. 512×512 + 1024×1024) shift absolute times;
+  compare runs with the same dataset mix.
 
 ## Important Notes
 - Test each change individually
