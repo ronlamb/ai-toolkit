@@ -40,12 +40,14 @@ def rope(pos: Tensor, dim: int, theta: float = 1e4, ntk: float = 1.0) -> Tensor:
 
 
 def ropeapply(xq: Tensor, xk: Tensor, freqs: Tensor) -> tuple[Tensor, Tensor]:
-    xq_ = xq.float().reshape(*xq.shape[:-1], -1, 1, 2)
-    xk_ = xk.float().reshape(*xk.shape[:-1], -1, 1, 2)
-    freqs = freqs[:, None, :, :, :]
+    # Apply the rotation directly in x's dtype. The fp32 round-trip materializes
+    # ~134 MB of upcast q/k per call only to be downcast again at the end.
+    freqs = freqs.to(xq.dtype)[:, None, :, :, :]
+    xq_ = xq.reshape(*xq.shape[:-1], -1, 1, 2)
+    xk_ = xk.reshape(*xk.shape[:-1], -1, 1, 2)
     xq_ = freqs[..., 0] * xq_[..., 0] + freqs[..., 1] * xq_[..., 1]
     xk_ = freqs[..., 0] * xk_[..., 0] + freqs[..., 1] * xk_[..., 1]
-    return xq_.reshape(*xq.shape).to(xq.dtype), xk_.reshape(*xk.shape).to(xk.dtype)
+    return xq_.reshape(*xq.shape), xk_.reshape(*xk.shape)
 
 
 def attention(

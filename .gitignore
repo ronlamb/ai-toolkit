@@ -186,7 +186,7 @@ aitk_db.db
 /data
 .claude
 .continue
-
+.tmp_*
 # .github/prompts/*
 # .github/prompts/initial-prompt.md
 
