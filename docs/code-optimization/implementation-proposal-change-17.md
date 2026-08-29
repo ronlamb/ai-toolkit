@@ -1,6 +1,7 @@
 # Change #17: Fix silently-dropped gradients in `txtfusion` (reentrant checkpoint bug)
 
-**Status**: PROPOSED — **CORRECTNESS fix, not a speedup** (awaiting user decision)
+**Status**: ⚠️ REVERTED 2026-08-29 (user decision) — correct but +11% steady s/it; revisit only
+after confirming whether txtfusion is *intended* to train (see `current-state.md` open question)
 **Complexity**: Simple (2 lines — add `use_reentrant=False` at two call sites)
 **Impact**: Restores training of the entire `txtfusion` sub-network (4 transformer blocks + their LoRA adapters). Expected to make training *slower* per step, not faster — see cost table.
 
@@ -110,7 +111,52 @@ user decision rather than folded into this correctness fix.
    slightly (txtfusion backward now runs) — this is the correctness cost, not a regression. Judge on
    whether generated samples improve, since txtfusion LoRA adapters finally train.
 
-## Decision needed from user
+## Validation results (2026-08-29, RTX 4090, torch 2.9.1+cu128) — steps 1–2 ✅
+
+Fix applied at both call sites (`mmdit.py` lines 284 and 323:
+`checkpoint(self._forward, x, mask, use_reentrant=False)`).
+
+- **Component-level** — `TextFusionTransformer` on CUDA bf16 with inputs
+  `requires_grad=False`: output `requires_grad=True`, `grad_fn` present,
+  **49/49 params non-zero grad**, zero checkpoint warnings. (Pre-fix: `grad_fn=None`.)
+- **Model-level** — `SingleStreamDiT` with gradient checkpointing enabled and cached
+  non-grad context: **txtfusion 49/49** params with non-zero grad; whole model
+  **92/92**. Gradients restored.
+- `pytest tests/` → **44 passed**.
+
+*Test-config gotcha*: tiny test configs must give cuDNN SDPA a supported head dim —
+defaults `txtheads=txtkvheads=20` with `txtdim=1024` yield headdim 51 → "No available
+kernel". Use `txtheads=8, txtkvheads=8` (headdim 128). The real model is unaffected
+(`txtdim=2560` → headdim 128).
+
+**Step 3 (user benchmark) pending.**
+
+## Benchmark results — user run 2026-08-29 (short bench, same dataset mix)
+
+| Epoch | Cum s/it | Per-step avg s/it | Samples avg (s/img) |
+|-------|----------|-------------------|---------------------|
+| 1 | 4.81 | 4.79 (warm-up) | 68.49 |
+| 2 | 4.41 | 4.03 | 67.68 |
+| 3 | 4.05 | 3.33 | 67.61 |
+| 4 | 3.82 | 3.13 | 66.46 |
+| 5 | 3.71 | 3.30 | 64.20 |
+| 6 | **3.63** | 3.20 | 63.95 |
+
+vs #16 best: epochs 4–6 per-step avg **3.21 vs 2.89 (+11%)**; bottom-out cumulative
+**3.63 vs 3.09 (+17%, still descending at epoch 6)**; samples epochs 4–6 avg **64.9 vs
+64.7 (flat — sampling skips checkpointing, as predicted)**.
+
+Measured cost ≈ **~320 ms/step**, ~3× the proposal's ~100 ms estimate: the restored
+backward covers txtfusion's full gradient path over the batched `B×12` sequence every step.
+
+## Decision needed from user — options
+
+- **A. Keep as-is**: correct training, +11% steady-state s/it cost.
+- **B. Revert**: back to #16 speed; txtfusion (incl. its LoRA adapters) stays frozen/dead weight.
+- **C. Flatten the nested checkpoints** (remove the inner block-level `checkpoint`, keep only
+  the outer one): correctness kept, saves the double-recompute (~36 ms/step measured at
+  Lt=512 standalone), raises peak VRAM ~+670 MB in txtfusion. Would recover a fraction of the
+  cost; needs a re-benchmark + VRAM check.
 
 This changes **what trains**, not just how fast. Approving it means accepting a small per-step slowdown
 in exchange for actually training a sub-network that is currently dead weight. Recommend approving —
