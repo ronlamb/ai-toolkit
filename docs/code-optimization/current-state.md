@@ -259,6 +259,87 @@ original per-call `temb` freqs; `krea2.py` restored to the original
 
 ---
 
+## Optimization Opportunities (Set 4 — compute-path audit: copies, dtypes, checkpointing)
+
+Audit of the per-step compute path inside `SingleStreamDiT.forward` (mmdit.py): dtype round-trips,
+padding, attention backends, mask construction, and the checkpointing configuration. Micro-benchmarks
+on RTX 4090 / torch 2.9.1 / bf16 at real dims. Branch `krea_4`, starting from change #10 state
+(bottom-out **3.02 s/it**, ~67.2 s/image in the 1024-mix).
+
+### Change #14: Remove dead 256-alignment padding in `SingleStreamDiT.forward`
+**Status**: 💡 PROPOSED (not yet implemented)
+**Complexity**: Simple (~9 lines removed)
+**Expected Impact**: ~1–3% both loops (mechanistic: strictly removes work on every forward)
+
+`combined = F.pad(...)` pads the sequence to a multiple of 256 **in eager mode** — up to 255 extra
+tokens run through all 28 blocks (~6% wasted compute at typical L≈4352→4352, more at short
+resolutions: Lt=20+1024 → +128 pad tokens ≈ +11%). The comment says "to stabilize compiled kernel
+shapes", but nothing in the Krea 2 path compiles this forward (no `torch.compile` anywhere in the
+extension). Padding also pads `mask`/`pos`, and the output slice already excludes it. Removing the
+block is safe; fallback variant pads to `% 16` if any kernel shape sensitivity appears.
+
+**Details**: See `implementation-proposal-change-14.md`
+
+### Change #15: Lean RMSNorm — drop the per-call fp32 round-trip
+**Status**: 💡 PROPOSED (not yet implemented)
+**Complexity**: Simple (~2 lines in one function)
+**Expected Impact**: ~1% training, ~1% sampling (measured micro-bench in proposal)
+
+`RMSNorm.forward` upcasts activations to fp32 (`x.float()`), runs `F.rms_norm` in fp32 with a
+fp32 weight, then downcasts — materializing two full fp32 activation copies per call (~50 MB at
+L=4352). 116 RMSNorm calls/forward (2 per block × 28 + QKNorm + txtfusion + last). Measured:
+RMSNorm forward 0.8 → 0.1 ms; block fwd+bwd 105.2 → 101.6 ms (−3.4%). Numerics: ~0.15% rel err on
+outputs/grads vs current, same as the bf16 noise floor elsewhere in the block.
+
+**Details**: See `implementation-proposal-change-15.md`
+
+### Change #16: Lean `ropeapply` — apply RoPE in bf16 instead of a full fp32 round-trip
+**Status**: 💡 PROPOSED (test after #15 so deltas are attributable)
+**Complexity**: Simple (~5 lines in one function)
+**Expected Impact**: ~1–2% training, ~1–2% sampling
+
+`ropeapply` upcasts q and k to fp32 (~134 MB per call at L=4352), does the rotation in fp32, then
+downcasts back to bf16. 28 calls/forward. Measured: one call 1.49 → 0.51 ms; combined with #15,
+block fwd+bwd 101.6 → 99.4 ms. Numerics ~0.63% rel err — touches the positional signal, so a
+fixed-seed visual sample check is required before keeping.
+
+**Details**: See `implementation-proposal-change-16.md`
+
+### Change #17: Fix silently-dropped gradients in `txtfusion` (reentrant checkpoint bug)
+**Status**: 🐛 CORRECTNESS FIX PROPOSED — user decision required, NOT a speedup
+**Complexity**: Simple (2 lines: `use_reentrant=False` at two call sites)
+
+`TextFusionBlock.forward` (line 282) and `TextFusionTransformer.forward` (line 321) call
+`checkpoint(...)` without `use_reentrant=`, which on torch 2.9.1 uses the **reentrant** path. The
+reentrant path builds no backward graph when no input requires grad — and in training the text
+embeds are cached (`cache_text_embeddings: true`) so none do. Verified end-to-end at model level:
+`txtfusion` gets **0/33** params with gradients today; with `use_reentrant=False`, **33/33**. Since
+LoRA attaches to these modules (the `blocks` substring in `get_transformer_block_names` matches
+`txtfusion.*`), those adapters have been trainable-but-never-trained in every run to date.
+
+Fixing it adds real txtfusion fwd+recompute+bwd per step (~100 ms/step at Lt=512 measured on the
+standalone sub-network at real dims — previously skipped entirely), so s/it is expected to rise
+slightly while samples should improve once txtfusion LoRA adapters actually train. Nested
+checkpointing (both levels non-reentrant) is also measured as the slowest layout (99 ms vs 63 ms
+single-level at Lt=512, but 670 MB lower peak); flattening to one level is an optional separate
+decision.
+
+**Details**: See `implementation-proposal-change-17.md`
+
+### Audited and rejected in Set 4 (no change proposed)
+- **SDPA backend preference list** (let torch pick among FLASH/EFFICIENT/cuDNN instead of the
+  forced cuDNN pin at `attention()` line ~52) — measured: forced cuDNN is already the fastest
+  backend for these shapes (GQA 48/12 heads, d=128). The existing pin is optimal; recorded in
+  change-15's rejected-alternative section.
+- **`_mask` broadcast-view instead of materialized (B,1,L,L)** — measured 3.31 vs 3.39 ms/forward
+  (~1% of attention time), below the >5% threshold; cuDNN may also de-vectorize on broadcast strides.
+- **CFG cond+uncond batching** (single forward with B=2 instead of two forwards with B=1 in the
+  sampling loop) — measured B=2 costs 2.01× B=1 (ratio 1.006 per batch element): no win, GPU already
+  saturated at B=1 for these shapes.
+- **RoPE `omega`/freqs caching** — set-3 #12/#13 reverted; do not re-propose.
+
+---
+
 ### Audited and rejected (no change proposed)
 - **`prepare()` per-step grid/mask rebuild** — already rejected in set-2 (Change #7
   reverted: +8.6% training). The ~5 small tensor allocations are not worth the
