@@ -15,7 +15,23 @@ safe, output dtype float32.
 (bottom-out 3.26, cumulative-rate metric), samples 66.98–67.76 s/image
 (epochs 4-6 avg 67.15). Vs change #10 stable (3.22 s/it, 67.21 s/image):
 training +3.4% (variance — the change removes work, cannot logically slow),
-samples −0.1% (flat). Full table in `current-state.md`.
+samples −0.1% (flat).
+
+| Epoch | Steps | Total time | Avg training (s/it) | S1 | S2 | S3 | S4 | Avg sample (s) |
+|-------|-------|------------|---------------------|--------|--------|--------|--------|----------------|
+| 1 | 30 | 1:50 | 3.81 | 68.54 | 67.71 | 67.44 | 67.34 | 67.76 |
+| 2 | 30 | 1:45 | 3.65 | 67.30 | 67.35 | 67.27 | 67.25 | 67.29 |
+| 3 | 30 | 1:33 | 3.47 | 67.36 | 67.25 | 67.23 | 67.19 | 67.26 |
+| 4 | 30 | 1:37 | 3.41 | 67.30 | 67.24 | 67.22 | 67.19 | 67.24 |
+| 5 | 30 | 1:29 | 3.32 | 67.28 | 67.23 | 67.19 | 67.18 | 67.22 |
+| 6 | 30 | 1:29 | 3.26 | 67.34 | 67.20 | 67.29 | 66.08 | 66.98 |
+
+*Avg training (s/it) is the progress bar's cumulative rate at epoch end. Total time
+is the per-epoch elapsed delta (excludes sample generation).*
+
+**Comparison vs Change #10 (epochs 4-6 stable)**: training 3.22 → 3.33 s/it
+(**+3.4%, slower**); samples 67.21 → 67.15 s/image (**−0.1%, flat**). **Reverted**
+per protocol — `mmdit.py` restored to the original float64 `rope`.
 
 ## Complexity
 Simple (~15 lines across `rope` + `PositionalEncoding`)

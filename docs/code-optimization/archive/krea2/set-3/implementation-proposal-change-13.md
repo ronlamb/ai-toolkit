@@ -6,7 +6,31 @@
 **Benchmark summary**: 6 epochs × 30 steps, 4 images. Training bottom-out 3.16 s/it
 vs current best's 3.02 s/it (+4.6%); samples ~69.5s/image (1024-mix epochs) vs
 ~67.2s baseline (+3.4%). Dataset mixes 512×512 + 1024×1024 sets, so absolute
-sample times shift with the mix. Full table in `current-state.md`.
+sample times shift with the mix.
+
+> **Baseline calibration note (added in set 4)**: the 3.02 s/it figure is from a longer
+> (~179+ step) run and is not comparable to the 6×30 short benchmark, which bottoms out at
+> ~3.22–3.26 s/it in the change #10 state. Against that corrected baseline this change's
+> training was neutral-to-faster (3.16 vs 3.22); samples were slower (+3.4%), so it was still
+> reverted — but the "+4.6% slower" framing overstated the regression.
+
+| Epoch | Steps | Total time | Avg training (s/it) | S1 | S2 | S3 | S4 | Avg sample (s) |
+|-------|-------|------------|---------------------|--------|--------|--------|--------|----------------|
+| 1 | 30 | 1:59 | 4.12 | 70.62 | 70.00 | 69.79 | 69.77 | 70.05 |
+| 2 | 30 | 1:42 | 3.76 | 69.58 | 69.58 | 69.56 | 69.55 | 69.57 |
+| 3 | 30 | 1:35 | 3.56 | 69.57 | 69.51 | 69.50 | 69.49 | 69.52 |
+| 4 | 30 | 1:39 | 3.49 | 69.65 | 69.57 | 69.51 | 69.50 | 69.56 |
+| 5 | 30 | 1:44 | 3.49 | 69.61 | 69.60 | 69.57 | 69.07 | 69.46 |
+| 6 | 30 | 1:21 | 3.36 | 64.31 | 64.22 | 64.19 | 64.17 | 64.22 |
+
+*Avg training (s/it) is the progress bar's cumulative rate at epoch end. Total time is the
+per-epoch elapsed delta (excludes sample generation). Epoch 6's ~64s samples reflect a
+lighter-resolution batch in the mixed dataset, not an improvement.*
+
+**Verdict**: slower samples (+3.4%) with no training win — **reverted** per protocol.
+`mmdit.py` restored to the original per-call `temb` freqs; `krea2.py` restored to the original
+`return latents.to(device, dtype=dtype)`. Test suite re-verified (44 passed). Part B (the no-op
+`.to()` removal in `encode_images`) was never benchmarked on its own.
 
 **Implementation notes**:
 - Part A: cache key is `(dim, period, device)` (added `period` vs. the original

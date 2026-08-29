@@ -1,6 +1,8 @@
-# Change #14: Remove dead 256-alignment padding in `SingleStreamDiT.forward`
+# Change #14: Re-align sequence padding (% 256 → % 32)
 
-**Status**: PROPOSED (not yet implemented)
+**Status**: ✅ KEPT (variant B) — benchmarked: ~−2% training and samples vs short-benchmark
+baseline; kept by user decision  
+**Variant A (remove padding entirely): ❌ REVERTED — training regression, see below**
 **Complexity**: Simple (5 lines removed)
 **Expected Impact**: 2–8% training **and** sampling (largest at short captions / mixed resolutions)
 **Applies to**: both training loop and image generation loop
@@ -57,6 +59,48 @@ If cuDNN SDPA turns out to prefer aligned sequence lengths, keep alignment but s
 ```
 
 Test A first; only try B if A is slower. (Same file, same lines.)
+
+## Variant A result — REGRESSION (benchmark, user run)
+
+Full padding removal regressed training: per-epoch deltas bottomed out at **~3.60–3.80 s/it**
+(epochs 4–6) vs the short-benchmark baseline **~3.22–3.26 s/it** (+10–17%), samples ~66–69 s/image
+(flat-to-worse). Samples improved slightly epoch-over-epoch while training plateaued high —
+consistent with a backward-only slowdown at unaligned lengths.
+
+> **Baseline correction (user)**: the 3.02 s/it figure is from a longer (~179+ step) run; the
+> standard 6×30 short benchmark bottoms out at ~3.22–3.26 s/it in the change #10 state. All Set-4
+> comparisons use the short-benchmark baseline.
+
+Micro-benchmarks explain it (`attention()` fwd+bwd, real head counts 48q/12kv, d=128, bf16,
+RTX 4090, torch 2.9.1 — per-token ns):
+
+| pad target | short bucket L=1071 | long bucket L=4141 |
+|---|---|---|
+| odd (variant A) | 1.171 | **3.725** ← slow |
+| % 16 | 1.193 | 3.467 |
+| **% 32** | **1.098** | **3.177** ← best |
+| % 64 | 1.119 | 3.162 (tie) |
+| % 256 (old code) | 1.246 | 3.289 |
+
+Odd lengths hurt the attention backward at long sequences; `% 256` over-pads up to 8× more tokens
+than needed. **% 32 wins at both buckets** — better than old code AND better than no padding.
+
+## Variant B implemented (% 32)
+
+```python
+        # Align the sequence to a multiple of 32: cuDNN SDPA and the bf16 GEMM
+        # kernels run ~15% faster per token on aligned lengths (measured, RTX 4090,
+        # torch 2.9.1, fwd+bwd). % 256 over-padded by up to 8x more tokens than needed.
+        _padlen = (-combined.shape[1]) % 32
+        if _padlen > 0:
+            combined = F.pad(combined, (0, 0, 0, _padlen))
+            mask = F.pad(mask, (0, _padlen), value=False)
+            pos = F.pad(pos, (0, 0, 0, _padlen))
+```
+
+Expected vs old `% 256` code: attention −14% at the long bucket (less padding AND better kernel
+shape), ~−25% per token at short buckets. Equivalence vs old code verified bitwise-identical at
+L=1071/4141/4608 (tiny L=36 differs ≤1 bf16 ulp). `pytest tests/`: 44 passed.
 
 ## Validation plan
 

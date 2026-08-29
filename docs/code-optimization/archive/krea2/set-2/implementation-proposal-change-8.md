@@ -1,8 +1,12 @@
 # Implementation Proposal #8: Cache RoPE Frequencies for Fixed Positions
 
 ## Status
-⬜ PROPOSED - Awaiting implementation and user testing  
-**Depends on**: Change #7 (stable `pos` object identity). **Do not apply standalone** — see Safety Notes.
+⚠️ REVERTED / NOT APPLIED — the shape-only cache key produces wrong results.
+Implementation was attempted with a shape-based key `(tuple(pos.shape), pos.device)` instead of
+`(pos.data_ptr(), pos.shape)`: different aspect ratios (e.g. 512×1024 vs 1024×512) produce the same
+`pos.shape` but hold different position values, so the cache returned wrong RoPE frequencies and
+corrupted output. The `data_ptr()` identity below is only reliable when Change #7 keeps a single
+live `pos` tensor per module; without #7 there is no safe cache key. Code restored.
 
 ## Complexity
 Moderate (6-10 lines changed in `SingleStreamDiT.forward` + a small cache field)
