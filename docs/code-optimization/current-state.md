@@ -42,16 +42,44 @@ Short benchmark = 6 epochs × 30 steps, 4 images, same dataset throughout (mixes
 
 Reverted (no measurable improvement or regression): #7, #8 (set 2); #11, #12, #13 (set 3);
 #14 variant A — remove padding entirely (+10–17% training regression; see
-`set-4/results-change-14.md`).
+`set-4/results-change-14.md`); #15 — lean RMSNorm (dead-even training, samples slower; user
+decision).
+
+## Benchmark results — Change #15 (lean RMSNorm), tested 2026-08-29
+
+Short bench, same dataset mix. Cumulative `s/it` at epoch end; per-step avg from total-time deltas.
+
+| Epoch | Cum s/it | Per-step avg s/it | Samples avg (s/img) |
+|-------|----------|-------------------|---------------------|
+| 1 | 3.84 | warm-up | 65.39 |
+| 2 | 3.61 | 3.40 | 66.78 |
+| 3 | 3.23 | 2.47 (anomalous fast epoch) | 66.52 |
+| 4 | 3.23 | 3.23 | 66.65 |
+| 5 | 3.22 | 3.17 | 66.65 |
+| 6 | 3.19 | 3.03 | 66.30 |
+
+| Metric | #14 best | #15 | Delta |
+|--------|----------|-----|-------|
+| Epochs 4–6 avg (s/it) | ~3.15–3.18 | 3.14 | −0.3…−1.2% (within variance) |
+| Final cumulative (s/it) | 3.15–3.16 | 3.19 | +1% |
+| Samples epochs 4–6 avg (s/img) | ~65.8 | 66.5 | +0.7% (slower) |
+
+Plateau inside the #14 band; samples slightly slower; epoch-3 per-step 2.47 is a single
+anomalous epoch (1:14 vs steady ~1:33–1:37), not sustained bottom-out. Micro-benchmark predicted
+~2–3% training gain; plateau shows ≤1% at best → negligible/mixed.
+
+**Decision (user): ⚠️ REVERTED** — sample times are the deciding metric and #15 was consistently
+slower there (66.5 vs 65.8 s/img avg, slower in epochs 2–6); training was a dead heat. Code
+restored via `git checkout -- extensions_built_in/diffusion_models/krea2/src/mmdit.py`.
 
 ## Pending work (Set 4)
 
-Proposals in `implementation-proposal-change-15..17.md`. None implemented yet.
+Proposals in `implementation-proposal-change-15..17.md`.
 
 | # | Change | Expected impact | Status |
 |---|--------|-----------------|--------|
-| 15 | Lean RMSNorm — drop per-call fp32 round-trip | ~1% both loops (block fwd+bwd −3.4% measured) | 💡 awaiting approval |
-| 16 | Lean `ropeapply` — bf16 instead of fp32 round-trip | ~1–2% both loops | 💡 awaiting approval; test after #15 so deltas are attributable |
+| 15 | Lean RMSNorm — drop per-call fp32 round-trip | ~1% both loops (block fwd+bwd −3.4% measured) | ⚠️ REVERTED — tested: training dead-even (epochs 4–6 per-step 3.14 vs 3.15), samples +0.7–1.1% slower; user decided to revert |
+| 16 | Lean `ropeapply` — bf16 instead of fp32 round-trip | ~1–2% both loops | 💡 awaiting approval |
 | 17 | Fix silently-dropped gradients in `txtfusion` (reentrant checkpoint) | **not a speedup** — correctness fix; adds ~100 ms/step of previously-skipped backward | 🐛 user decision |
 
 ### Audited and rejected (no change proposed)

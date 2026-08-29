@@ -1,6 +1,6 @@
 # Change #15: Lean `RMSNorm` — drop the per-call fp32 round-trip
 
-**Status**: PROPOSED (not yet implemented)
+**Status**: ⚠️ REVERTED — tested; dead-even training, samples slower; user decided to revert
 **Complexity**: Simple (~6 lines in one class)
 **Expected Impact**: ~1–3% training, small sample improvement (block-level measurement below)
 **Applies to**: both loops — `RMSNorm` runs 58× per forward in the main blocks (prenorm+postnorm × 28 + `LastLayer`), plus 4× inside txtfusion when not pre-fused
@@ -57,3 +57,53 @@ Replaced `with sdpa_kernel(SDPBackend.CUDNN_ATTENTION)` in `attention()` with a 
 - `pytest tests/` (44 passed baseline).
 - Benchmark: 6+ epochs × 30 steps, 4 images; compare **bottom-out s/it** + sample times vs current best (#10 state) with the same dataset mix. Test after #14 so deltas are attributable per change.
 - Keep if beyond variance; negligible → user decides; slower → revert (`git checkout -- extensions_built_in/diffusion_models/krea2/src/mmdit.py`).
+
+## Validation results (pre-benchmark, 2026-08-29)
+
+Implemented in `extensions_built_in/diffusion_models/krea2/src/mmdit.py` exactly as proposed (4-line change in `RMSNorm.forward`).
+
+Equivalence check (`.tmp_opt_test/test_change15_rmsnorm.py`, old extracted from git HEAD, bf16,
+L=4864, features=6144, identical fixed upstream gradients):
+
+| Quantity | max_abs | mean_rel |
+|---|---|---|
+| forward | 0.03125 | 0.146% |
+| grad_x | 0.03125 | 0.159% |
+| grad_scale | 0.99500 | 0.141% |
+
+All within bf16 rounding noise (~0.4% epsilon) — matches the proposal's prediction (0.15%).
+`scale` remains a fp32 `Parameter`; `state_dict` keys unchanged (`['scale']`).
+
+Micro-benchmark (fwd+bwd, same script): old **2.058 ms** → new **0.530 ms** per call (~−1.5 ms,
+consistent with the proposal's ~1.4 ms estimate).
+
+`pytest tests/`: **44 passed**. No lint/type errors in `mmdit.py`.
+
+**Awaiting**: user benchmark (6 epochs × 30 steps, 4 images) vs current best (~3.15–3.18 s/it,
+~65.8 s/img).
+
+## User benchmark results (2026-08-29) — 🤔 negligible / mixed
+
+Short bench, same dataset mix as #14. Full table in `current-state.md`.
+
+| Metric | #14 best | #15 this run | Delta |
+|--------|----------|--------------|-------|
+| Epochs 4–6 avg (s/it) | ~3.15–3.18 | 3.14 | −0.3…−1.2% (within variance) |
+| Final cumulative (s/it) | 3.15–3.16 | 3.19 | +1% |
+| Samples epochs 4–6 avg (s/img) | ~65.8 | 66.5 | +0.7% (slower) |
+
+Plateau lands inside the #14 band; samples marginally slower. Epoch 3 per-step (2.47 s/it,
+epoch total 1:14 vs steady ~1:33–1:37) is a single anomalous epoch, not sustained bottom-out.
+The micro-benchmark gain (~1.5 ms/call × ~56 calls ≈ 80 ms/step ≈ 2.5%) did **not** materialize
+end-to-end — likely because activation checkpointing recompute overlaps these small memory-bound
+kernels with attention/GEMM, or the allocator already avoids the fp32 copy cost in context.
+
+**Decision**: ⚠️ **REVERTED by user** — sample times are the deciding metric and #15 was
+consistently slower there (66.5 vs 65.8 s/img avg, epochs 2–6); training plateau was a dead heat
+(3.14 vs 3.15 per-step). Code restored with
+`git checkout -- extensions_built_in/diffusion_models/krea2/src/mmdit.py`.
+
+**Takeaway for future sets**: the lean-RMSNorm micro-benchmark gain (~1.5 ms/call) does not
+translate end-to-end on this model/VRAM budget — do not re-propose the fp32 round-trip removal
+for `RMSNorm` alone. If a similar idea is revisited, measure at the full-block or full-step level
+first, not per-op.
