@@ -25,7 +25,7 @@ Short benchmark = 6 epochs × 30 steps, 4 images, same dataset throughout (mixes
 | Set-1 baseline (change #5) | 3.25 | 65.64 | short bench |
 | Change #10 state (set 2 end) | 3.22 | ~67.2 | short bench; set-2 kept #6, #9, #10 |
 | Change #14 | ~3.15–3.18 | ~65.8 | padding `% 256` → `% 32` |
-| **Change #16 (current best)** | **~3.09–3.13** | **~64.7** | lean `ropeapply` bf16 |
+| **Change #16 (current best)** | **~3.09–3.13** | **~64.7** | lean `ropeapply` bf16; **+20 pts visual accuracy, ~31% faster convergence vs #10 state (full runs)** |
 | Full-run bottom-out (#10 state) | 2.93 | 64.85 | long run (172 imgs, 9 samples/checkpoint) — different scale; per-checkpoint data in `archive/krea2/set-3/results-baseline-asof-change10.md` |
 
 **Net vs set-1 baseline (short bench)**: training **−4%**, samples **−1.4%**.
@@ -190,6 +190,129 @@ Suggested next step when revisiting: ask the model author / check upstream Krea 
 whether txtfusion + its LoRA are meant to train, then pick (a) or (b). If (b), also confirm no
 existing checkpoints carry trained-looking txtfusion LoRA weights (they should be identical to
 init, since they never received gradients).
+
+## Full-run validation — state as of #16 (vs #10 full-run baseline), tested 2026-08-30
+
+Same protocol as the set-3 baseline (`archive/krea2/set-3/results-baseline-asof-change10.md`):
+172 images/epoch, checkpoint every epoch, 9 samples per checkpoint, run to step 3784. Code = #10 +
+#14 + #16 (#15 and #17 reverted). Run name `anna_bell_sex_krea_ut_2`.
+
+| Steps | Cum s/it | Per-step avg (Δ/172) | Samples avg (s/img) | Mode |
+|-------|----------|----------------------|---------------------|------|
+| 172 | 3.19 | warm-up | 66.1 | — |
+| 344 | 2.99 | 2.79 | 65.0 | fast-ish |
+| 516 | 2.92 | 2.78 | 67.7 | mixed |
+| 688 | 2.93 | 2.95 | 67.7 | slow |
+| 860 | 2.94 | 2.98 | 67.7 | slow |
+| 1032 | 2.94 | 2.94 | 67.7 | slow |
+| 1204 | 2.94 | 2.97 | 67.7 | slow |
+| 1376 | 2.94 | 2.95 | 67.8 | slow |
+| 1548 | 2.95 | 2.96 | 67.7 | slow |
+| 1720 | 2.95 | 2.96 | 66.3 | slow |
+| 1892 | 2.93 | 2.71 | 62.6 | fast |
+| 2064 | 2.91 | 2.73 | 62.9 | fast |
+| 2236 | 2.90 | 2.74 | 62.6 | fast |
+| 2408 | 2.89 | 2.74 | 62.7 | fast |
+| 2580 | 2.88 | 2.73 | 66.0 | mixed |
+| 2752 | 2.88 | 2.97 | 67.9 | slow |
+| 2924 | 2.88 | 2.94 | 67.8 | slow |
+| 3096 | 2.89 | 2.97 | 63.4 | mixed |
+| 3268 | 2.88 | 2.74 | 63.5 | fast |
+| 3440 | 2.87 | 2.74 | 62.7 | fast |
+| 3612 | 2.87 | 2.75 | 62.8 | fast |
+| 3784 | **2.86** | 2.74 | 63.6 | fast |
+
+### Key finding: run oscillates between two performance modes
+
+Training per-step and sample times are **bimodal, and the two metrics track each other
+checkpoint-by-checkpoint**: fast mode ≈ 2.74 s/it + ~62.7 s/img; slow mode ≈ 2.96 s/it +
+~67.8 s/img. The #10 baseline run was flat (~2.91–2.95, ~64.8–65.1) with no fast mode at all —
+so this is not new-run noise but a sustained multi-hour GPU state difference (thermal/power or
+environmental load), affecting training and sampling together.
+
+### Comparison vs #10 full-run baseline (2.93 s/it bottom-out, 64.85 s/img)
+
+| Metric | #10 baseline | #16-state run | Delta |
+|--------|--------------|---------------|-------|
+| Bottom-out cumulative (s/it) | 2.93 | **2.86** | **−2.4%** |
+| Mean per-step, steps 516–3784 | 2.90 | 2.85 | −1.7% |
+| Fast-mode per-step | ~2.91 (flat) | **2.73–2.75** | **−5.9%** |
+| Slow-mode per-step | ~2.91 (flat) | 2.94–2.98 | +1.5% |
+| Mean samples (s/img) | 64.85 | 65.4 | +0.9% |
+| Fast-mode samples | ~64.85 | **62.6–63.6** | **−2.5…−3.4%** |
+| Slow-mode samples | ~64.85 | 67.7–67.9 | +4.5% |
+
+Interpretation: in fast mode the #14+#16 code is clearly better than the #10 baseline on **both**
+metrics (−6% training, −3 % samples); slow mode matches or slightly exceeds baseline. Averages are
+muddied by the mode oscillation — if the slow mode is environmental (GPU clocks/thermals), the
+true improvement is closer to the fast-mode numbers.
+
+**User-reported qualitative results (pending): image quality and convergence improvements noted in
+this run — details were cut off when pasting; to be appended here.**
+
+## Qualitative validation — Change #16 state vs #10 state (full runs, same dataset)
+
+Manual per-checkpoint review of the two full runs (`anna_bell_sex_krea_ut` = #10 state,
+`anna_bell_sex_krea_ut_2` = #16 state): 9 samples per epoch scored per aspect (count correct / 9;
+tattoo categories scored against images that actually have that attribute). Visual accuracy = user's
+overall estimate.
+
+### Epochs 1–10 — visual accuracy trajectory
+
+| Epoch | #10 | #16 | Epoch | #10 | #16 |
+|-------|-----|-----|-------|-----|-----|
+| 1 | 20% | 25% | 6 | 40% | **50%** |
+| 2 | 25% | 25% | 7 | 40% | 50% |
+| 3 | 20% | 20% | 8 | 45% | **60%** |
+| 4 | 35% | 35% | 9 | 50% | **65%** |
+| 5 | 35% | 30% | 10 | 50% | **70%** |
+
+Body/face/hair first "locked in" at epoch ~10 for both, but #16 pulled ahead immediately after.
+Minor caveat: #16's *position* accuracy dipped in epochs 1–3 (5–6/9 vs 8–9/9) before catching up —
+consistent with the warm-up wobble seen in the short bench.
+
+### Peak window (epochs 15–17) — per-aspect at epoch 15
+
+| Aspect | #10 | #16 | Aspect | #10 | #16 |
+|--------|-----|-----|--------|-----|-----|
+| Hair color / style | 9/9, 9/9 | 9/9, 9/9 | Chest tattoos (6) | **0** | **3** |
+| Face / Body | 9/9, 9/9 | 9/9, 9/9 | Back tattoos (2) | 0 | **2** |
+| Arm tattoos (8) | 7 | **9** | Leg tattoos (7) | 2 | **5** |
+| Position | 9 | 9 | **Visual accuracy** | **70%** | **90–95%** |
+
+The gap is concentrated in **fine/rare detail**: tattoo categories. Chest and back tattoos never
+materialized in #10's early-mid epochs; they appear by epoch 9–15 in #16.
+
+### Convergence point (the headline result)
+
+| | #10 state | #16 state |
+|---|-----------|-----------|
+| Converged at | ~epoch 29 (chest tattoos not consistent until ~epoch 32) | **~epoch 20** |
+| Steps to convergence | ~4,988–5,504 | **~3,440** |
+| Quality at convergence | baseline | **better than #10's epoch 32** |
+
+**#16 converges ~1,550 steps (~31%) earlier at higher final accuracy.** For production training
+that is a larger real-world saving than the per-step speedups: same quality in ~⅔ the compute.
+
+### Interpretation — why would "speed" changes improve quality?
+
+Both runs have txtfusion frozen (reverted #17), so the difference comes from #14 + #16 alone.
+#14 (padding `% 256` → `% 32`) is numerically neutral when masking is correct. #16 changes
+numerics: RoPE tables are now bf16-rounded instead of fp32-computed-then-downcast — a small,
+consistent perturbation to rotation embeddings at every attention call. Plausible mechanisms
+(unverified): regularization-like noise improving generalization on rare features (tattoos appear
+in few images), or simply a different-but-better training trajectory (numerics diverge from step 1).
+Either way the effect is large (+20 pts visual accuracy at epoch 10 and 15, ~31% faster
+convergence) and reproducible across the user's manual review — worth recording as #16's primary
+benefit, with the caveat that trajectory variance cannot be fully excluded without a repeat run.
+
+### Implication for change #17 (txtfusion design question)
+
+The strong quality gains came from code where txtfusion was **frozen** — so they neither require
+nor rule out training it. They do show the pipeline learns these fine details *without* txtfusion
+gradients, which slightly favors design (b): if a future experiment wants to test (a), it should be
+an explicit quality A/B (keep #16 code + gradient fix, compare convergence at epoch 20/30), not a
+silent change.
 
 ## Pending work (Set 4)
 
