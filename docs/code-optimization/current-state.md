@@ -395,12 +395,35 @@ written; nothing applied yet.
 
 | # | Proposal | Finding | Status |
 |---|----------|---------|--------|
-| 18 | `implementation-proposal-change-18.md` | A — `_get_step_indices` reversal | 📝 written, awaiting implementation session |
-| 19 | `implementation-proposal-change-19.md` | B — `pad_text_features` ragged crash (+ folded in the `lengths` CPU→GPU copy) | 📝 written, awaiting implementation session |
-| 20 | `implementation-proposal-change-20.md` | C — `to_device_if_needed` device compare + dtype-skip | 📝 written, awaiting implementation session |
-| 21 | `implementation-proposal-change-21.md` | D — `flip_x` UnboundLocalError + duplicate import | 📝 written, awaiting implementation session |
+| 18 | `implementation-proposal-change-18.md` | A — `_get_step_indices` reversal | implemented 2026-08-31, awaiting user benchmark |
+| 19 | `implementation-proposal-change-19.md` | B — `pad_text_features` ragged crash (+ folded in the `lengths` CPU→GPU copy) | written, awaiting implementation session |
+| 20 | `implementation-proposal-change-20.md` | C — `to_device_if_needed` device compare + dtype-skip | written, awaiting implementation session |
+| 21 | `implementation-proposal-change-21.md` | D — `flip_x` UnboundLocalError + duplicate import | written, awaiting implementation session |
 | — | *(no proposal)* | E — delete `toolkit/util/torch_util.py` + `tests/test_torch_util.py` | user decided: delete |
 | 22? | *(to decide)* | Scheduler weight-cache thrash (`cuda` vs `cuda:0`) | separate task per user |
+
+### Set 5 — implementation results
+
+#### Change #18 — `_get_step_indices` reversal fix (implemented 2026-08-31, branch `krea_5`)
+
+Applied the minimal fix from the proposal (18 → 12 lines, single function,
+callers unchanged). Correctness-only: dormant under the benchmark config
+(batch_size 1, `timestep_type: linear`, `linear_timesteps` false), so expected
+benchmark result is **exactly neutral** — no-regression confirmation only.
+
+Local validation (all passed):
+- Repro vs main's equality-loop semantics (`.tmp_opt_test/repro_change18.py`): linear grid
+  unsorted batch-3 `[923, 456, 781]` → `[77, 544, 219]` PASS (old branch code returned the
+  reversed `[219, 544, 77]`); batch-1 and all-equal cases unchanged; random batch-8,
+  sigmoid grid (exact + unsorted), and ascending-grid cases all match expected.
+- `pytest tests/` → **44 passed**.
+
+| Metric | Current best (#16) | #18 | Verdict |
+|--------|--------------------|-----|---------|
+| Bottom-out training (s/it) | 3.09 | *(pending user run)* | expect neutral |
+| Samples epochs 4–6 avg (s/img) | 64.7 | *(pending user run)* | expect neutral |
+
+**Status: IMPLEMENTED — awaiting user benchmark.**
 
 ## Testing Protocol
 

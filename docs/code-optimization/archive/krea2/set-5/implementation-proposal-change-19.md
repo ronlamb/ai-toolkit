@@ -1,6 +1,6 @@
 # Change #19: Fix ragged-caption crash in Krea2 `pad_text_features` (keep vectorized fast path)
 
-**Status**: 📝 PROPOSED 2026-08-30 (approved for implementation in a separate session)
+**Status**: PROPOSED 2026-08-30 (approved for implementation in a separate session)
 **Complexity**: Simple (~14 lines changed, one function, under the 20-line limit)
 **Impact**: Crash fix + removes a per-call CPU→GPU sync. **Exactly neutral** on the current
 benchmark path (single-prompt sampling takes the fast path). Dormant-but-fatal for any multi-prompt

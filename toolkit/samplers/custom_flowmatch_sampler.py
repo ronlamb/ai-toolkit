@@ -119,22 +119,14 @@ class CustomFlowMatchEulerDiscreteScheduler(FlowMatchEulerDiscreteScheduler):
         timesteps = timesteps.to(device=base.device, dtype=base.dtype)
 
         if base[0] > base[-1]:
-            base = torch.flip(base, dims=[0])
-            flipped = True
-        else:
-            flipped = False
+            # searchsorted requires an ascending base. Invert the resulting indices
+            # back to descending-grid positions. The queries themselves are NOT
+            # sorted (timesteps are sampled randomly per sample during training),
+            # so they must never be reordered — output position i must match input
+            # position i.
+            return (len(base) - 1) - torch.searchsorted(torch.flip(base, dims=[0]), timesteps)
 
-        if flipped:
-            t = torch.flip(timesteps, dims=[0])
-        else:
-            t = timesteps
-
-        idx = torch.searchsorted(base, t)
-
-        if flipped:
-            idx = (len(self.timesteps) - 1) - idx
-
-        return idx
+        return torch.searchsorted(base, timesteps)
 
     def set_train_timesteps(
         self,

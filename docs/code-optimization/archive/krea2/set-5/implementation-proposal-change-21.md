@@ -1,6 +1,6 @@
 # Change #21: Fix `data_loader.py` flip_x crash (`UnboundLocalError`) + duplicate import
 
-**Status**: 📝 PROPOSED 2026-08-30 (approved for implementation in a separate session)
+**Status**: PROPOSED 2026-08-30 (approved for implementation in a separate session)
 **Complexity**: Trivial (2 lines: restore 1 assignment, delete 1 duplicate import)
 **Impact**: **Hard crash fix.** Any dataset configured with `flip_x: true` fails during dataset
 setup with `UnboundLocalError: cannot access local variable 'new_file_item'`. Dormant under the

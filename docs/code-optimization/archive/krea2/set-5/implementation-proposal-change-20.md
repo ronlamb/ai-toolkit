@@ -1,6 +1,6 @@
 # Change #20: Fix `to_device_if_needed` — device compare never matches on CUDA; dtype silently skipped
 
-**Status**: 📝 PROPOSED 2026-08-30 (approved for implementation in a separate session)
+**Status**: PROPOSED 2026-08-30 (approved for implementation in a separate session)
 **Complexity**: Simple (~15 lines, one module-level function + call sites unchanged)
 **Impact**: Restores the function's stated purpose ("only transfer if needed") on CUDA/MPS, and
 fixes a silent dtype-skip. **Expected neutral-to-neutral+** on the benchmark: `.to()` is already a

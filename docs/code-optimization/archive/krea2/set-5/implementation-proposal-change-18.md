@@ -1,6 +1,6 @@
 # Change #18: Fix reversed sample↔index pairing in `_get_step_indices` (batch > 1 correctness bug)
 
-**Status**: 📝 PROPOSED 2026-08-30 (approved for implementation in a separate session)
+**Status**: IMPLEMENTED 2026-08-31 — awaiting user benchmark (no-regression confirmation)
 **Complexity**: Simple (~6 lines changed, single function, well under the 20-line limit)
 **Impact**: Correctness fix. Prevents silent loss-weight corruption when timestep weighting is
 enabled at batch_size > 1. **Dormant for current Krea2 configs** (see "Live status" below) — a
@@ -124,4 +124,29 @@ No API change; callers unchanged.
 
 ## Results
 
-*(pending implementation session)*
+### Implementation (2026-08-31, branch `krea_5`)
+
+Applied the proposed fix verbatim to `_get_step_indices` in
+`toolkit/samplers/custom_flowmatch_sampler.py`. Net 18 → 12 lines; callers unchanged.
+
+### Unit validation (all passed, `.venv` Python, torch 2.9.1+cu128)
+
+Repro script `.tmp_opt_test/repro_change18.py` checks the fixed function against main's exact-
+equality-loop semantics (per-query position preserved):
+
+| Case | Queries | Expected (= main) | Got | Result |
+|---|---|---|---|---|
+| linear grid, unsorted batch-3 | `[923, 456, 781]` | `[77, 544, 219]` | `[77, 544, 219]` | PASS (old branch code returned `[219, 544, 77]`) |
+| linear grid, batch-1 | `[958]` | `[42]` | `[42]` | PASS unchanged |
+| linear grid, all-equal | `[500, 500, 500]` | `[500, 500, 500]` | same | PASS unchanged |
+| linear grid, random batch-8 | 8 random grid values | equality-loop | match | PASS |
+| sigmoid grid, exact grid values (unsorted) | positions `[3, 17, 41]` | `[3, 17, 41]` | `[3, 17, 41]` | PASS |
+| sigmoid grid, unsorted batch-4 | positions `[50, 2, 31, 9]` | same | match | PASS |
+| ascending grid, unsorted batch-3 | positions `[9, 400, 777]` | same | match | PASS |
+
+`pytest tests/` → **44 passed** (no test covers this function; no regressions).
+
+### Benchmark
+
+*(pending user run — expected exactly neutral vs current best: bottom-out 3.09 s/it,
+samples 64.7 s/img; function is never called under the benchmark config)*
