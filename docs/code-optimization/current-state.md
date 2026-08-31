@@ -335,13 +335,72 @@ Proposals in `implementation-proposal-change-15..17.md`.
 - **RoPE `omega`/freqs caching** — set-3 #12/#13 reverted; do not re-propose.
 - **`prepare()` per-step grid/mask rebuild** — set-2 #7 reverted (+8.6% training); the small tensor
   allocations are not worth the cache-key complexity.
-- **`pad_text_features`** — optimized in set 1 (#3); current stack+slice version is fine.
+- **`pad_text_features`** — ~~optimized in set 1 (#3); current stack+slice version is fine.~~
+  **CORRECTED 2026-08-30: this entry was wrong.** The #3 vectorized version crashes on ragged
+  caption lengths (`torch.stack` before padding). See finding B / change #19 below.
 - **`.to(device)` no-op removals in `predict_noise` / `get_noise_prediction`** — no-ops when
   already on device; not worth touching shared code. (Part B of #13, the `encode_images` `.to()`
   removal, was never benchmarked on its own.)
 - **`calculate_loss` fp32 MSE accumulation** — intentional precision for bf16 training; keep.
 - **Text encoder re-encode per step** — only when `cache_text_embeddings` is off; user's config
   has it on.
+
+## Set 5 — audit of main…krea_5 (2026-08-30)
+
+Detour audit of all changes since `main` (sets 1–4 + earlier MPS/CUDA work), restricted to code on
+the Krea 2 path, looking for: calculation simplification, dead code, and extra CPU↔GPU transfers.
+**No code changed yet.** All findings are being written up as proposals first; each will be
+implemented in its own separate session.
+
+Decisions taken during review:
+- One change per fix (A, B, C, D benchmarked separately) — cleanest attribution.
+- Change #18 kept **strictly minimal**; the scheduler cache-thrash is a separate task (#19).
+- The unused `toolkit/util/torch_util.py` module + its test: **delete** (user decision).
+- Non-performance changes are still benchmarked (short bench, no-regression confirmation).
+
+### Verified findings
+
+| # | Finding | File | Severity | Proposal |
+|---|---------|------|----------|----------|
+| A | `_get_step_indices` reverses sample↔index pairing for batch > 1 (assumes queries are sorted; they are random per sample) | `toolkit/samplers/custom_flowmatch_sampler.py` | Correctness — **dormant** under current configs (batch_size 1, `timestep_type: linear`) | #18 |
+| B | `pad_text_features` crashes on ragged caption lengths (`torch.stack` before padding) | `krea2/src/pipeline.py` | Crash — any multi-prompt batch with differing token counts | #19 (see note) |
+| C | `to_device_if_needed` device compare never matches on CUDA (`cuda` vs `cuda:0`) → always copies; also silently ignores `dtype` for `PromptEmbeds` already on device | `extensions_built_in/sd_trainer/SDTrainer.py` | Perf (defeats its own purpose) + dtype-skip edge | #20 |
+| D | `flip_x` NameError — `deepcopy` line commented out, assignment left behind; plus duplicate `import copy` | `toolkit/data_loader.py` ~L568 | Crash when `flip_x: true` | #21 |
+| E | `toolkit/util/torch_util.py` — 128 lines / 14 helpers, zero production call sites (only its own test + docs) | `toolkit/util/torch_util.py` | Dead code | delete module + test |
+
+### Minor findings (folded into related changes or noted only)
+
+- Scheduler weight-cache thrash: `_cached_device != timesteps.device` compares unindexed `cuda`
+  vs `cuda:0`, so the 3 weight tensors are re-copied every call. Separate task from #18 by user
+  decision. Only live when weighted timesteps are enabled.
+- `pad_text_features`: `torch.tensor(lengths, device=device)` is a CPU→GPU copy per call — fold
+  into the same change as B since that function is being rewritten anyway.
+- `encode_images` per-image VAE loop (set-1 #1) loses batched encode on CUDA; MPS-motivated.
+  Candidate for its own perf proposal if wanted.
+- Dead import `precondition_model_outputs_flow_match` in SDTrainer (never invoked anywhere).
+- Whitespace-only diff in `toolkit/data_transfer_object/data_loader.py` — diff noise.
+- Per-step `hasattr(_cached_pipeline)` in `end_step_hook` — never true for Krea2Model; harmless.
+
+### Open question carried from the audit
+
+`set_train_timesteps` sigmoid/shift branches were rewritten (duplicate last element + argsort
+descending) so `timesteps`/`sigmas` lengths align. Semantics differ from main's `ones`/`zeros`
+append. Not yet checked for correctness — only matters for configs using
+`timestep_type: sigmoid|shift|flux_shift|lognorm_blend`.
+
+### Proposal index (set 5)
+
+Written to `archive/krea2/set-5/`. Implementation happens one-per-session after all proposals are
+written; nothing applied yet.
+
+| # | Proposal | Finding | Status |
+|---|----------|---------|--------|
+| 18 | `implementation-proposal-change-18.md` | A — `_get_step_indices` reversal | 📝 written, awaiting implementation session |
+| 19 | `implementation-proposal-change-19.md` | B — `pad_text_features` ragged crash (+ folded in the `lengths` CPU→GPU copy) | 📝 written, awaiting implementation session |
+| 20 | `implementation-proposal-change-20.md` | C — `to_device_if_needed` device compare + dtype-skip | 📝 written, awaiting implementation session |
+| 21 | `implementation-proposal-change-21.md` | D — `flip_x` UnboundLocalError + duplicate import | 📝 written, awaiting implementation session |
+| — | *(no proposal)* | E — delete `toolkit/util/torch_util.py` + `tests/test_torch_util.py` | user decided: delete |
+| 22? | *(to decide)* | Scheduler weight-cache thrash (`cuda` vs `cuda:0`) | separate task per user |
 
 ## Testing Protocol
 
