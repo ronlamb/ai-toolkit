@@ -396,7 +396,7 @@ written; nothing applied yet.
 | # | Proposal | Finding | Status |
 |---|----------|---------|--------|
 | 18 | `implementation-proposal-change-18.md` | A — `_get_step_indices` reversal | implemented 2026-08-31, awaiting user benchmark |
-| 19 | `implementation-proposal-change-19.md` | B — `pad_text_features` ragged crash (+ folded in the `lengths` CPU→GPU copy) | written, awaiting implementation session |
+| 19 | `implementation-proposal-change-19.md` | B — `pad_text_features` ragged crash (+ folded in the `lengths` CPU→GPU copy) | **implemented + benchmarked with control: KEEP** (control run slower than #19 → session drift, not regression) |
 | 20 | `implementation-proposal-change-20.md` | C — `to_device_if_needed` device compare + dtype-skip | written, awaiting implementation session |
 | 21 | `implementation-proposal-change-21.md` | D — `flip_x` UnboundLocalError + duplicate import | written, awaiting implementation session |
 | — | *(no proposal)* | E — delete `toolkit/util/torch_util.py` + `tests/test_torch_util.py` | user decided: delete |
@@ -434,6 +434,48 @@ variance (see `set-5/implementation-proposal-change-18.md` benchmark section).
 
 **Status: IMPLEMENTED — benchmarked, no regression. KEEP.**
 
+#### Change #19 — `pad_text_features` ragged-caption crash fix (implemented 2026-08-31, branch `krea_5`)
+
+Applied the proposed replacement verbatim (14+/13−, single function in
+`extensions_built_in/diffusion_models/krea2/src/pipeline.py`). Fixes finding B
+(`torch.stack` before padding crashed any ragged multi-prompt batch) and folds in the
+minor finding: mask now built on CPU and transferred once, removing the per-call
+implicit CPU→GPU sync from `torch.tensor(lengths, device=device)`.
+Fast path preserved: equal-length lists still take a single vectorized stack+copy.
+
+Local validation (all passed):
+- Repro `.tmp_opt_test/repro_change19.py` vs reference per-row-loop semantics on **CPU and
+  CUDA**: pre-fix the 3 ragged cases crash on both devices; post-fix all 5 cases × 2 devices
+  PASS (features + mask exactly equal to reference, mask dtype long).
+- `pytest tests/` → **44 passed**.
+
+Expected benchmark: **exactly neutral** — benchmark config caches text embeddings (equal
+lengths → fast path) and samples single prompts (B=1). No-regression confirmation only.
+
+| Metric | Baseline (#16) | #18 run | #19 run |
+|--------|----------------|---------|----------|
+| Cumulative s/it @ step 179 | 3.09 (bottom-out) | ~3.12 | **3.22** (+4% vs #18) |
+| Samples avg (s/img) | 64.7 | 63.7–67.6 band | **≈68.4** — every round ≥ top of #18 band |
+
+**Slower in both phases**, but attribution analysis shows the slowdown cannot come from this
+code: ~180 training calls + 48 sampling calls total under the bench, each on a tiny tensor —
+explaining the deltas would need ~0.13 s/call in training and ~5 s/call in sampling. Features
+and mask are bitwise-equal to the old code on the fast path (loss values unchanged step-for-step),
+and both phases slowed together — signature of GPU thermal state / background load, not of this
+function. Full analysis + options in `set-5/implementation-proposal-change-19.md`.
+
+**Control experiment**: user ran the #19 bench twice in one session with identical results,
+which excludes within-session noise but cannot compare against baselines measured in earlier
+sessions. `pipeline.py` was reverted to HEAD for a same-session control bench (fix saved in
+`.tmp_opt_test/change19.patch`).
+
+Control result (2026-09-01, pre-#19 code): **3.36 s/it @179 / ≈69.2 s/img — slower than both
+#19 runs** (3.22 / ≈68.4). Decisively the "session drift" outcome: today's machine state sits
+below every historical band, so the apparent #19 regression vs history was never caused by
+#19. Fix re-applied and re-validated (repro ALL PASS cpu+cuda, pytest 44).
+
+**Status: IMPLEMENTED — control-benched, no regression vs same-code baseline. KEEP.**
+
 ## Testing Protocol
 
 For each change:
@@ -443,6 +485,11 @@ For each change:
    against the current best above, same dataset mix.
 4. Keep only if it improves speed beyond run-to-run variance (~5%); negligible → user decides;
    slower → revert.
+5. **Cross-session baselines go stale** (learned 2026-08-31/09-01 during #19): machine state
+   drifted ~5–8% below the historical band within days, making a neutral change look like a
+   regression. If a bench result disagrees with the mechanism analysis by more than noise,
+   run a **same-session control** (revert the code, bench, re-apply) before reverting or
+   keeping.
 
 ## Notes
 

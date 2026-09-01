@@ -1,6 +1,8 @@
 # Change #19: Fix ragged-caption crash in Krea2 `pad_text_features` (keep vectorized fast path)
 
-**Status**: PROPOSED 2026-08-30 (approved for implementation in a separate session)
+**Status**: IMPLEMENTED + BENCHMARKED (incl. same-session control) 2026-08-31/09-01 — **KEEP**.
+Slower vs historical baseline, but the pre-change control run is *slower still*: session drift,
+not this change.
 **Complexity**: Simple (~14 lines changed, one function, under the 20-line limit)
 **Impact**: Crash fix + removes a per-call CPU→GPU sync. **Exactly neutral** on the current
 benchmark path (single-prompt sampling takes the fast path). Dormant-but-fatal for any multi-prompt
@@ -118,4 +120,97 @@ Removed: the old three-step stack/slice/assign block and the two device-side mas
 
 ## Results
 
-*(pending implementation session)*
+### Implementation (2026-08-31, branch `krea_5`)
+
+Applied the proposed replacement body verbatim to `pad_text_features` in
+`extensions_built_in/diffusion_models/krea2/src/pipeline.py`. Diff: 14 insertions /
+13 deletions, single function; signature, docstring, and callers unchanged.
+
+### Unit validation (all passed, `.venv` Python, torch 2.9.1+cu128)
+
+Repro script `.tmp_opt_test/repro_change19.py` checks `pad_text_features` against reference
+per-row-loop semantics (main / ideogram4): features and mask must be exactly equal
+(`torch.equal`), mask dtype `long`. Cases run on **both CPU and CUDA tensors**.
+
+| Case | Before fix | After fix |
+|---|---|---|
+| ragged `[7, 5]` | `RuntimeError: stack expects each tensor to be equal size` | PASS — matches reference |
+| ragged `[5, 7]` (order swapped) | same crash | PASS — matches reference |
+| random ragged ×5 | crash | PASS — matches reference |
+| equal lengths `[6, 6, 6]` (fast path) | PASS | PASS — matches reference |
+| batch-1 `[9]` (sampling path) | PASS | PASS — matches reference |
+
+Pre-fix run confirmed the crash on both devices (3 ragged cases × cpu/cuda = 6 RuntimeErrors,
+equal-length/batch-1 passed). Post-fix: **ALL PASS** (10/10).
+
+`pytest tests/` → **44 passed** (no test covers this function; no regressions).
+
+### Benchmark (user runs, 2026-08-31)
+
+Short bench (`anna_bell_sex_krea_ut`, 30 steps/epoch, 4 images), slower than both baselines:
+
+| Metric | Baseline (#16 best) | #18 run | **#19 run** |
+|---|---|---|---|
+| Cumulative s/it @ step 179 | 3.09 (bottom-out) | ~3.12 | **3.22** (+4% vs #18) |
+| Samples per-round avg (s/img) | 64.7 | 63.7–67.6 (band) | **67.9–69.0, overall ≈68.4** (+5.8% vs baseline) |
+
+Per-sample-round averages: 68.82 / 67.89 / 68.24 / 68.27 / 68.44 / 69.01 — every round at or
+above the top of #18's band (67.6). Training cumulative curve: 4.13 → 3.63 → 3.42 → 3.35 →
+3.35 → **3.22** s/it.
+
+### Attribution analysis — slowdown is NOT mechanistically attributable to this change
+
+Call counts under the benchmark config (verified against call sites):
+
+| Path | `pad_text_features` calls | Cost budget |
+|---|---|---|
+| Training (180 steps, batch 1) | 1 per step = **180 total** | would need ~0.13 s/**call** to explain +0.1 s/it — impossible for a (1×~77×F) tensor |
+| Sampling (6 rounds × 4 imgs, CFG) | 2 per image = **48 total** | would need ~5 s/**call** to explain +3.7 s/img — absurd |
+
+Numerics are identical: features and mask verified bitwise-equal to the old implementation on
+the fast path (repro covers equal-length cases on CPU **and** CUDA), so training loss values are
+unchanged step-for-step — only wall-clock differs, and it differs in *both* phases together,
+which is the signature of a shared environmental factor (GPU thermal state / background load),
+not of a code path that executes ~230 times for microseconds total.
+
+The one real (tiny) cost delta: fast-path `.to()` adds at most one extra device-to-device copy
+(~6 MB ≈ tens of µs) when embeds are already on GPU — 4–5 orders of magnitude too small.
+
+**User feedback (2026-08-31)**: the #19 bench was run **twice**, nothing different in the
+background, both runs matched — so within-session noise is excluded. Two same-code runs
+agreeing does NOT compare against baselines measured in *earlier sessions*; only a
+same-session control can separate "#19 is slower" from "machine state drifted since".
+User also notes (prior experience): if/else branches have caused slowdowns in tight loops,
+and questions the `enumerate` loop efficiency. Rebuttal recorded: this function runs once per
+training step and twice per sampled image (~230 calls total per bench) — not a tight loop;
+the ragged `for` path never executes under the bench config (cached embeds → equal lengths →
+fast path), so it is dead code there. Branch cost is nanoseconds; explaining the observed
+deltas would require ~0.13 s per training call and ~5 s per sampling call.
+
+### Control experiment (in progress)
+
+`pipeline.py` reverted to HEAD (pre-#19) for a **same-session control bench**; the #19 fix is
+saved in `.tmp_opt_test/change19.patch` (`git apply` restores it). Decision matrix:
+
+| Control result | Meaning | Action |
+|---|---|---|
+| ≈3.22 s/it / ≈68 s/img (matches #19 runs) | session drift — baseline is also slower today | re-apply #19, KEEP; record corrected same-session baseline |
+| ≈3.09–3.12 / ≈64–67 (matches history) | #19 costs ~4% despite the mechanism analysis | profile per-call timing to find the mechanism, or revert permanently |
+
+### Control bench result (2026-09-01, pre-#19 code, same machine/session style)
+
+| Metric | Control (pre-#19) | #19 run 1 | #19 run 2 (same session as control? no — prior day) |
+|---|---|---|---|
+| Cumulative s/it @ step 179 | **3.36** | 3.22 | 3.22 |
+| Samples avg (s/img) | **≈69.2** (69.5–69.8 rounds 1–5, 67.8 last) | ≈68.4 | ≈68.4 |
+
+The control is **slower than the #19 runs on both metrics** — decisively matching the
+"session drift" row of the decision matrix (and even overshooting it: today's baseline sits
+below every previous band, training 3.36 vs 3.09–3.22, samples ~69 vs 64.7–68). #19 is at
+worst neutral vs same-code control; if anything marginally faster, plausibly from the removed
+per-call CPU→GPU mask sync.
+
+**Verdict: KEEP.** Fix re-applied after control (2026-09-01) and re-validated:
+`.tmp_opt_test/repro_change19.py` ALL PASS (5 cases × cpu/cuda), `pytest tests/` 44 passed.
+Historical baselines (3.09 s/it / 64.7 s/img) are stale as of this week — future comparisons
+should use a same-session control, per the protocol note in `current-state.md`.
