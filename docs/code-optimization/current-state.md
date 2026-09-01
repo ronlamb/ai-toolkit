@@ -420,10 +420,19 @@ Local validation (all passed):
 
 | Metric | Current best (#16) | #18 | Verdict |
 |--------|--------------------|-----|---------|
-| Bottom-out training (s/it) | 3.09 | *(pending user run)* | expect neutral |
-| Samples epochs 4–6 avg (s/img) | 64.7 | *(pending user run)* | expect neutral |
+| Bottom-out training (s/it), short bench | 3.09 | ~3.12 @ step 179 | neutral — no regression |
+| Samples epochs 4–6 avg (s/img) | 64.7 | ~63.7–67.6 | neutral |
+| Full run bottom-out (s/it) | 2.86 (`ut_2 - Copy`, #17 state, 22 ckpts) | **2.82** (36 ckpts) | faster + lower; see caveat |
 
-**Status: IMPLEMENTED — awaiting user benchmark.**
+Full-run note: the new run also bottomed out sooner. ~1.4% gain is **not attributable to #18**
+(function never executes under this config) — likely longer run (cumulative avg over 6192 vs
+3784 steps) + unseeded shuffle variance.
+
+Run-comparability caveat: `training_seed` unset → training RNG differs every run; sample seeds
+only pin generation latents. Cross-run quality comparisons are confounded by run-to-run
+variance (see `set-5/implementation-proposal-change-18.md` benchmark section).
+
+**Status: IMPLEMENTED — benchmarked, no regression. KEEP.**
 
 ## Testing Protocol
 

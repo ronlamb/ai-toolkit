@@ -146,7 +146,25 @@ equality-loop semantics (per-query position preserved):
 
 `pytest tests/` → **44 passed** (no test covers this function; no regressions).
 
-### Benchmark
+### Benchmark (user runs, 2026-08-31)
 
-*(pending user run — expected exactly neutral vs current best: bottom-out 3.09 s/it,
-samples 64.7 s/img; function is never called under the benchmark config)*
+Short bench (`anna_bell_sex_krea_ut`, 30 steps/epoch): cumulative 3.12 s/it at step 179;
+samples ~63.7–67.6 s/img — within the #16 band (bottom-out 3.09, samples 64.7). No regression.
+
+Full run (`anna_bell_sex_krea_ut_2`, vs prior full run `... ut_2 - Copy` = change-#17 state;
+configs byte-identical): bottom-out **2.82 s/it** (new) vs **2.86** (old), and the new run
+bottomed out sooner.
+
+Caveats recorded during review:
+- `_get_step_indices` is never called under this config, so #18 cannot change speed or
+  training numerics; the 2.86 → 2.82 delta (~1.4%) is not attributable to the code change.
+  The old run stopped at 22 checkpoints (~3784 steps) vs 36 (~6192 steps) for the new one —
+  cumulative-average s/it bottoms out lower in longer runs (warm-up amortization) — plus
+  unseeded shuffle order changes per-step bucket cost sequences.
+- **Sample drift between runs is expected and does NOT indicate a learning regression:**
+  `training_seed` is unset (and no `SEED` env), so training RNG (noise, timesteps, dataloader
+  shuffle) differs every run. Sample `seed: 42` + `walk_seed` only pins generation latents per
+  image, not the trained weights. Quality comparisons across runs are confounded by run-to-run
+  training variance unless `training_seed` is set.
+
+**Verdict: no regression — keep (correctness fix).**
