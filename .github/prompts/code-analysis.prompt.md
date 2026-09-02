@@ -6,25 +6,18 @@ description: 'Analyze codebase processing loop'
 Analyze the model's processing loop and propose speed optimizations for both **training** and **image generation**. 
 
 The user provide the model name; if missing, ask.
-Before suggesting changes, check `docs/code-optimization/archive/<model>/set-N` to avoid already-tested ideas.
+Before suggesting changes, check `docs/code-optimization/archive/<model>/set-N` to avoid repeating previously tested optimizations.
 
 ## Benchmark Ownership & Limits
 
 - The user runs all benchmarks.
-- You must **never**:
-  - run benchmarks,
-  - simulate benchmarks,
-  - fabricate benchmark results.
-- Your role:
-  - propose code changes,
-  - explain how to benchmark them,
-  - wait for real logs from the user.
+- You must **never** run, simulate, or fabricate benchmarks results.
+- Your role is to propose code changes, explain how to test them, and- wait for real logs.
 
-## Focus Areas
+## Focus On
 
-Look for:
-1. **Excessive CPU to GPU transfers**
-2. Replace **outdated CUDA/MPS patterns** with modern equivalents
+1. Eliminating **unnecessary CPU to GPU transfers**
+2. Updating **outdated CUDA/MPS patterns** to modern equivalents
 
 ## Constraints
 
@@ -40,13 +33,13 @@ Look for:
 
 For each optimization:
 
-1. Show the modified code (≤20 lines changed).
-2. Describe how to run unit tests (user runs them).
-3. Describe how to run benchmarks using the protocol below (user runs them).
-4. Document the change in `docs/code-optimization/implementation-proposal-change-N.md` 
-5. Update `docs/code-optimization/current-state.md` with:
-   - status: `PROPOSED`, `COMPLETED`, `REVERTED`, or `USER DECISION`;
-   - a short summary of the intended impact.
+1. Show the modified code (≤20 changed lines).
+2. Describe unit tests (user runs them).
+3. Describe benchmark steps (user runs them).
+4. Write a detailed proposal in `docs/code-optimization/implementation-proposal-change-N.md` 
+5. Add a short entyr to `docs/code-optimization/current-state.md` with:
+   - status (`PROPOSED`, `COMPLETED`, `REVERTED`, or `USER DECISION`);
+   - a 1-3 sentence  summary of the intended impact.
 
 The user will:
 - run tests and benchmarks,
@@ -54,57 +47,49 @@ The user will:
    
 ## Benchmark protocol (user-run)
 
-- Default: ≥3 epochs × 30 steps (Krea: 6 epochs × 30 steps).
+- Default: ≥3 epochs × 30 steps (Krea: 6×30 steps).
 - Generate 4 images per epoch.
 
 Collect:
 
 - training time per iteration (s/it),
 - sample generation time per image.
-
-### Metric interpretation
-
-- Use **bottom-out s/it** (minimum over the run), not early warm-up values.
-- Compare runs with the **same dataset mix**, especially for mixed resolutions.
-- A change is “faster” only if bottom-out training and/or sampling time improves.
+  - Use **bottom-out s/it** (minimum over the run), not early warm-up values.
 
 ## Validation
 
 ## Validation rules
-
-- **Faster:** keep.
-- **Slower:** revert.
-- **Negligible (±1–2%):** present data and ask the user; do not decide unilaterally.
-
-When explaining metrics, remember:
-
-- Progress-bar `s/it` is a **cumulative average** since training start.
-- Compare minimum `s/it` and sample times between runs, not just end slices.
-- Mixed-resolution datasets must be compared against runs with the same mix.
+- Faster → keep
+- Slower → revert
+- Negligible (±1–2%) → present data and let the user decide
+  - Compare bottom-out s/it and sample times only.
 
 ## State files
 
-Treat `docs/code-optimization/current-state.md` as the **single source of truth**:
+Treat `docs/code-optimization/current-state.md` is the single source of truth for status:
 
-- pending and completed changes with status,
+- pending and completed changes,
 - current best metrics,
-- benchmark tables and comparisons (vs baseline and previous sets),
-- baseline variation analysis.
+- short summaries.
 
-When starting a new set:
+Each propasal file `implementation-proposal-change-N.md` contains:
 
-1. Read `current-state.md` to understand current metrics and history.
-2. Add new proposed changes to `current-state.md`.
-3. Update status and results there after each benchmark.
-4. Draft detailed proposals in `docs/code-optimization/implementation-proposal-change-N.md`.
+- full benchmark summaries
+- comparisons
+- detailed analysis
+
+Archive completed proposal files under `docs/code-optimization/archive/<model>/set-N/`
 
 **Do not create separate results files.** All benchmark data should be recorded in the 'implementation-proposal-change-N.md' files.
 
-**Once a change is completed, archive the proposal file to `docs/code-optimization/archive/<model>/set-N/` and update `current-state.md` baseline results if they improved.
-
 ## Test & result recording
 
-Use the benchmark protocol above. The user will provide logs similar to:
+Record results in the proposal file:
+- baseline metrics
+- per-change metrics
+- comparisons vs baseline and previous change
+
+Update `current-state.md` with status + short summary only.
 
 ### Training Time
 
@@ -148,9 +133,8 @@ Record:
 ## Iteration rules
 
 - Test each change individually.
-- Use benchmark results to decide impact.
-- If improvement is small, you may suggest minor follow-up tweaks, then move on.
-- If improvement is clear, you may suggest small additional tweaks in the same area, then move on.
+- If improvement is small, you may suggest minor follow-up tweaks.
+- If improvement is clear, finish that area and move on.
 
 ## User checklist (pre-next change)
 
