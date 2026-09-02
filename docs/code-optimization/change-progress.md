@@ -72,8 +72,7 @@ Items investigated during set-4/5 audits and found to have no benefit:
 
 ## Qualitative validation — Change #16 state vs #10 state (full runs, same dataset)
 
-Manual per-checkpoint review of two full runs (`anna_bell_sex_krea_ut` = #10 state,
-`anna_bell_sex_krea_ut_2` = #16 state): 9 samples per epoch scored per aspect.
+Manual per-checkpoint review of two full runs (small_run = #10 state, full_run = #16 state): 9 samples per epoch scored per aspect.
 
 ### Epochs 1–10 — visual accuracy trajectory
 

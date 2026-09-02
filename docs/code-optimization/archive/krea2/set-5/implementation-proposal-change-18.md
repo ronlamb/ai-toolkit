@@ -70,7 +70,7 @@ The version below is the tested one.)
 
 ## Live status under current configs (blast-radius trace)
 
-| Caller | Gate | Current Krea2 config (`anna_bell_sex_krea_ut`) | Status |
+| Caller | Gate | Current Krea2 config (small_run) | Status |
 |---|---|---|---|
 | `get_weights_for_timesteps` (`SDTrainer.calculate_loss` ~L889) | `linear_timesteps`/`linear_timesteps2` true **or** `timestep_type == "weighted"` | all false / `"linear"` | never called → dormant |
 | scheduler `get_sigmas` | only reachable via `precondition_model_outputs_flow_match` (`toolkit/train_tools.py` ~L768) | function imported in SDTrainer but **never invoked anywhere** | dead path |
@@ -148,10 +148,10 @@ equality-loop semantics (per-query position preserved):
 
 ### Benchmark (user runs, 2026-08-31)
 
-Short bench (`anna_bell_sex_krea_ut`, 30 steps/epoch): cumulative 3.12 s/it at step 179;
+Short bench (30 steps/epoch): cumulative 3.12 s/it at step 179;
 samples ~63.7–67.6 s/img — within the #16 band (bottom-out 3.09, samples 64.7). No regression.
 
-Full run (`anna_bell_sex_krea_ut_2`, vs prior full run `... ut_2 - Copy` = change-#17 state;
+Full run (vs prior full run `... ut_2 - Copy` = change-#17 state;
 configs byte-identical): bottom-out **2.82 s/it** (new) vs **2.86** (old), and the new run
 bottomed out sooner.
 

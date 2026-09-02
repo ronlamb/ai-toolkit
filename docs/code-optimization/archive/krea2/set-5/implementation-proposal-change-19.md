@@ -147,7 +147,7 @@ equal-length/batch-1 passed). Post-fix: **ALL PASS** (10/10).
 
 ### Benchmark (user runs, 2026-08-31)
 
-Short bench (`anna_bell_sex_krea_ut`, 30 steps/epoch, 4 images), slower than both baselines:
+Short bench (30 steps/epoch, 4 images), slower than both baselines:
 
 | Metric | Baseline (#16 best) | #18 run | **#19 run** |
 |---|---|---|---|

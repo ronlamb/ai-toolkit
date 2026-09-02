@@ -81,8 +81,7 @@ on the very first iteration — there is no input for which L570 can succeed.
 
 - Triggered only when `self.dataset_config.flip_x` is true — dataset *construction* time, i.e.
   before any training step; crash happens in `LoRADataset.__init__`.
-- Current user config: `"flip_x": false` → dormant today (confirmed in
-  `output/anna_bell_sex_krea_ut/.job_config.json`).
+- Current user config: `"flip_x": false` → dormant today (confirmed in `.job_config.json`).
 - No other code depends on the broken behavior.
 
 ## Proposed change (restore to main's semantics)
