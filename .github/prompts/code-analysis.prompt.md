@@ -3,98 +3,108 @@ agent: 'agent'
 description: 'Analyze codebase processing loop'
 ---
 
-Please analyze the processing loop for the given model and identify ways to improve its speed in both the training loop and the image generation loop.
+Analyze the model's processing loop and propose speed optimizations for both **training** and **image generation**. 
 
-The user will give you the model name being optimized.  If not provided, ask.
-Look for previous code optimizations that are documented in the `docs/code-optimization/archive/<model>/set-N` folders, so you can avoid suggesting optimizations that have already been implemented and tested.
+The user provide the model name; if missing, ask.
+Before suggesting changes, check `docs/code-optimization/archive/<model>/set-N` to avoid already-tested ideas.
+
+## Benchmark Ownership & Limits
+
+- The user runs all benchmarks.
+- You must **never**:
+  - run benchmarks,
+  - simulate benchmarks,
+  - fabricate benchmark results.
+- Your role:
+  - propose code changes,
+  - explain how to benchmark them,
+  - wait for real logs from the user.
 
 ## Focus Areas
 
 Look for:
-1. **Excessive CPU to GPU copies** - Data transfers that could be eliminated or reduced
-2. **Not utilizing most up to date CUDA or MPS capabilities** - Outdated patterns that miss GPU optimizations
+1. **Excessive CPU to GPU transfers**
+2. Replace **outdated CUDA/MPS patterns** with modern equivalents
 
-## Requirements
+## Constraints
 
-- **Categorize by complexity**: Simple (1-5 lines), Moderate (6-10 lines), Complex (11-20 lines)
-- **Line Limit per function**: ≤20 lines changed
-- **No rewrites**: Only surgical, incremental improvements
-- **Top 5 optimizations**: Highest impact, lowest effort changes
+- Categorize each change as:
+  - **Simple:** 1–5 lines
+  - **Moderate:** 6–10 lines
+  - **Complex:** 11–20 lines
+- Change ≤20 lines per optimization.
+- **No rewrites**—surgical edits only.
+- Provide the **Top 5 highest-impact, lowest-effort** optimizations.
 
-## Process
+## Per-optimization workflow
 
-For each optimization opportunity:
-1. Write the optimized code (≤20 lines)
-2. Run unit tests
-3. Benchmark speed using the benchmark protocol below
-4. Document the change in:
-   - `docs/code-optimization/implementation-proposal-change-N.md` 
-5. Update `docs/code-optimization/current-state.md` to mark the change as 
-   - PROPOSED (if not yet tested)
-   - ✅ COMPLETED (if speed improved)
-   - ⚠️ REVERTED (if no measurable improvement or slower)
-   - 🤔 USER DECISION (if results are negligible — see Validation below; do not decide unilaterally)
-6. Once all optimizations are complete, the user will move all the change files to the `docs/code-optimization/archive/<model>/set-N` folder.
+For each optimization:
 
-## Benchmark Protocol
+1. Show the modified code (≤20 lines changed).
+2. Describe how to run unit tests (user runs them).
+3. Describe how to run benchmarks using the protocol below (user runs them).
+4. Document the change in `docs/code-optimization/implementation-proposal-change-N.md` 
+5. Update `docs/code-optimization/current-state.md` with:
+   - status: `PROPOSED`, `COMPLETED`, `REVERTED`, or `USER DECISION`;
+   - a short summary of the intended impact.
 
-### User's Test
+The user will:
+- run tests and benchmarks,
+- archive completed change files to `docs/code-optimization/archive/<model>/set-N`.
+   
+## Benchmark protocol (user-run)
 
-Run 3 (or more) epochs of 30 steps each and generate 4 images
+- Default: ≥3 epochs × 30 steps (Krea: 6 epochs × 30 steps).
+- Generate 4 images per epoch.
 
-### Metrics to Collect
+Collect:
 
-1. **Training time per iteration**: `X.XXs/it` from progress bar
-2. **Sample generation time**: Time per image from "Generating Samples" progress
+- training time per iteration (s/it),
+- sample generation time per image.
+
+### Metric interpretation
+
+- Use **bottom-out s/it** (minimum over the run), not early warm-up values.
+- Compare runs with the **same dataset mix**, especially for mixed resolutions.
+- A change is “faster” only if bottom-out training and/or sampling time improves.
 
 ## Validation
 
-- If speed improves → keep the change
-- If speed does not improve (slower) → revert the change
-- **If results are basically negligible** (within run-to-run variance, e.g. ±1–2%
-  on the bottom-out metric) → **let the user decide** whether to keep or revert.
-  Present the data (bottom-out s/it, sample times, variance context) and ask;
-  do not keep or revert unilaterally.
+## Validation rules
 
-### How to read the metrics (important)
-- The progress bar's `s/it` is a **cumulative average since training started**,
-  not the rate of the current epoch. Early warm-up steps drag it up, so compare
-  **bottom-out (minimum) values** between runs, not early-epoch numbers.
-- A change is only "faster" if its bottom-out s/it (and/or sample times) are
-  lower than the current best's bottom-out. Small end-of-run slices of
-  improvement do not count if overall total time and start/end times are flat.
-- Mixed-resolution datasets (e.g. 512×512 + 1024×1024) shift absolute times;
-  compare runs with the same dataset mix.
+- **Faster:** keep.
+- **Slower:** revert.
+- **Negligible (±1–2%):** present data and ask the user; do not decide unilaterally.
 
-## Important Notes
-- Test each change individually
-- User manually tests after implementation
-- Commit and push changes before the next optimization
+When explaining metrics, remember:
+
+- Progress-bar `s/it` is a **cumulative average** since training start.
+- Compare minimum `s/it` and sample times between runs, not just end slices.
+- Mixed-resolution datasets must be compared against runs with the same mix.
 
 ## State files
 
-Use **`docs/code-optimization/current-state.md`** as the single source of truth. This file contains:
-- All pending and completed changes with status
-- Current best metrics (training time, sample generation)
-- Full benchmark results (training time per step, sample generation per checkpoint)
-- Comparison tables (vs previous sets, vs original baseline)
-- Baseline variation analysis
+Treat `docs/code-optimization/current-state.md` as the **single source of truth**:
 
-When starting a new set of optimizations:
-1. Read `current-state.md` to understand the current state and metrics
-2. Add new changes to `current-state.md` as they are proposed
-3. Update status and actual results in `current-state.md` after testing
-4. Create detailed implementation proposals in `docs/code-optimization/implementation-proposal-change-N.md`
+- pending and completed changes with status,
+- current best metrics,
+- benchmark tables and comparisons (vs baseline and previous sets),
+- baseline variation analysis.
 
-**Do not create separate results files.** All benchmark data should be recorded in `current-state.md`.
+When starting a new set:
 
-## Test Protocol
+1. Read `current-state.md` to understand current metrics and history.
+2. Add new proposed changes to `current-state.md`.
+3. Update status and results there after each benchmark.
+4. Draft detailed proposals in `docs/code-optimization/implementation-proposal-change-N.md`.
 
-Use the benchmark protocol:
-- 3 or more epochs of 30 steps each 
-- 4 generated images.
+**Do not create separate results files.** All benchmark data should be recorded in the 'implementation-proposal-change-N.md' files.
 
-User will run this and provide logs.
+**Once a change is completed, archive the proposal file to `docs/code-optimization/archive/<model>/set-N/` and update `current-state.md` baseline results if they improved.
+
+## Test & result recording
+
+Use the benchmark protocol above. The user will provide logs similar to:
 
 ### Training Time
 
@@ -119,8 +129,7 @@ Generating Samples: 100%|####4     | 4/4 [04:27<05:33, 66.63s/it]
 
 ### Summarize Data
 
-Summarize results in a table with columns:
-
+Summarize each run in a table with:
 - epoch
 - steps
 - total time
@@ -130,52 +139,23 @@ Summarize results in a table with columns:
 - sample 3 time
 - sample 4 time
 
-## Recording Results
+Record:
 
-All benchmark results go into **`docs/code-optimization/current-state.md`**.
+- **Baseline** metrics before any change.
+- **Per-change** metrics, comparison vs baseline and previous change.
+- Status: ✅ `COMPLETED` or ⚠️ `REVERTED`, plus a short result summary.
 
-### Baseline Results
+## Iteration rules
 
-Before any change, record baseline metrics in `current-state.md`:
-- Training time per epoch
-- Sample generation times
-- Stable/bottom-out metrics
+- Test each change individually.
+- Use benchmark results to decide impact.
+- If improvement is small, you may suggest minor follow-up tweaks, then move on.
+- If improvement is clear, you may suggest small additional tweaks in the same area, then move on.
 
-### Change Results
+## User checklist (pre-next change)
 
-After each change, update `current-state.md` with:
-- New benchmark data
-- Comparison against baseline and previous change
-- Status (✅ COMPLETED or ⚠️ REVERTED)
-- Actual results summary
+Before proposing the next optimization, confirm the user has:
 
-Compare against:
-- The baseline (original unoptimized metrics)
-- The previous change
-
-## Validate Each Test
-
-Use benchmark results to confirm whether the change improved speed.
-
-## If There Is Little to No Speed Improvement
-
-- Optionally explore small tweaks
-- Then proceed to next optimization
-
-## If There Are Speed Improvements
-
-If a change improves speed:
-
-- Optionally explore small, additional tweaks in the same area
-- Once exhausted, proceed to the next optimization opportunity
-
-## Before Doing the Next Change Verify That the User:
-
-- [ ] Checked in the code in a new branch
-- [ ] Pushed the change to his forked git repo
-
-## Check list
-
-Make sure the user:
-- Manually tests each implemented change
-- Commits and pushes changes before starting the next optimization
+- [ ] Checked in the code on a new branch.
+- [ ] Pushed the change to their forked git repo.
+- [ ] Manually tested the implemented change.
