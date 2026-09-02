@@ -1,5 +1,4 @@
 import copy
-import copy
 import json
 import os
 import random
@@ -566,7 +565,8 @@ class AiToolkitDataset(LatentCachingMixin, ControlCachingMixin, CLIPCachingMixin
             print_acc("  -  adding x axis flips")
             current_file_list = [x for x in self.file_list]
             for file_item in current_file_list:
-                # create a copy copy.deepcopy(file_item)
+                # create a copy that is flipped on the x axis
+                new_file_item = copy.deepcopy(file_item)
                 new_file_item.flip_x = True
                 self.file_list.append(new_file_item)
 

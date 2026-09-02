@@ -1,6 +1,6 @@
 # Change #21: Fix `data_loader.py` flip_x crash (`UnboundLocalError`) + duplicate import
 
-**Status**: PROPOSED 2026-08-30 (approved for implementation in a separate session)
+**Status**: IMPLEMENTED + BENCHMARKED 2026-09-02 (branch `krea_5`) — no regression. KEEP
 **Complexity**: Trivial (2 lines: restore 1 assignment, delete 1 duplicate import)
 **Impact**: **Hard crash fix.** Any dataset configured with `flip_x: true` fails during dataset
 setup with `UnboundLocalError: cannot access local variable 'new_file_item'`. Dormant under the
@@ -9,7 +9,8 @@ but this is a latent crash for every user who enables horizontal-flip augmentati
 
 ## Issue — found during the main…krea_5 audit (2026-08-30)
 
-`toolkit/data_loader.py`, `LoRADataset.__init__` (function starts L388), flip_x block at L565–571.
+`toolkit/data_loader.py`, dataset constructor — **class is `AiToolkitDataset`** (`__init__` starts
+L388; this doc originally said `LoRADataset`, corrected 2026-09-01), flip_x block at L565–571.
 
 ### Before — current code (verbatim, L565–581)
 
@@ -124,4 +125,47 @@ Net change: **+1 / −2 lines** (restore assignment + real comment; delete dupli
 
 ## Results
 
-*(pending implementation session)*
+### Implementation (2026-09-01, branch `krea_5`)
+
+Applied exactly as proposed in `toolkit/data_loader.py`: restored the swallowed
+`new_file_item = copy.deepcopy(file_item)` assignment + real comment in the flip_x block
+(now identical in shape to the flip_y twin and to `main`), and deleted the duplicate
+`import copy` at L2. Net **−1 line** (2 changed locations).
+
+### Validation (2026-09-01, `.venv`) — ALL PASS
+
+Control-flow repros (exact structure of the two flip blocks in one `__init__`, per the
+proposal's root-cause analysis):
+
+| Case | Result |
+|---|---|
+| `flip_x=True`: no exception; list doubles; flipped copies appended; **originals unmutated**; no accidental y flips | PASS |
+| `flip_x=True` + `flip_y=True`: list ×4, all four (x,y) combos present exactly once, originals untouched | PASS |
+| Real `AiToolkitDataset.__init__` source: 2× `copy.deepcopy(file_item)` (flip_x + flip_y), assignment present in flip_x block | PASS |
+| Module header: single `import copy`, then `import json`; module compiles & imports cleanly | PASS |
+
+- `pytest tests/` → **44 passed**.
+
+### Benchmark (2026-09-02, short bench: 6 epochs × 30 steps, 4 images)
+
+| Epoch | cum s/it @ epoch end | incremental s/it | samples s/img (×4) | samples avg |
+|-------|----------------------|------------------|--------------------|-------------|
+| 1 | 3.66 | 3.53 | 65.16 / 64.18 / 63.73 / 63.87 | 64.2 |
+| 2 | 3.55 | 3.43 | 63.31 / 62.95 / 62.87 / 62.83 | 63.0 |
+| 3 | 3.29 | 2.80 | 63.06 / 62.86 / 62.80 / 62.83 | 62.9 |
+| 4 | 3.11 | 2.53 | 62.72 / 62.73 / 63.09 / 62.99 | 62.9 |
+| 5 | 3.11 | 3.13 | 64.41 / 63.47 / 63.53 / 63.36 | 63.7 |
+| 6 | **3.09** | 2.97 | 62.73 / 62.83 / 62.87 / 62.87 | 62.8 |
+
+Bottom-out cumulative: **3.09 s/it** @ step 179 vs **#20 run's 3.08** — flat (−0.3%, noise).
+Samples: overall avg ≈63.2 s/img, epochs 4–6 avg ≈63.1, min per-image 62.7. Samples came in
+≈6% faster than the #20 run (≈65.9 / ≈67.4), but the fixed lines are **dormant under this
+config** (`flip_x: false`) — they never execute, so nothing here is attributable to #21;
+that delta is session drift (same pattern as #18/#19/20). Training flat as predicted.
+
+Bench agrees with mechanism analysis (neutral) → no same-session control needed
+(Testing Protocol #5 not triggered).
+
+**Status: IMPLEMENTED — benchmarked, no regression. KEEP** (hard crash fix for `flip_x: true`
+datasets; zero runtime cost under other configs). Historical best-sample figures (64.7, #16)
+NOT updated from this run — cross-session numbers aren't comparable without a control.

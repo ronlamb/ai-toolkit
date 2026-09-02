@@ -398,7 +398,7 @@ written; nothing applied yet.
 | 18 | `implementation-proposal-change-18.md` | A — `_get_step_indices` reversal | implemented 2026-08-31, awaiting user benchmark |
 | 19 | `implementation-proposal-change-19.md` | B — `pad_text_features` ragged crash (+ folded in the `lengths` CPU→GPU copy) | **implemented + benchmarked with control: KEEP** (control run slower than #19 → session drift, not regression) |
 | 20 | `implementation-proposal-change-20.md` | C — `to_device_if_needed` device compare + dtype-skip | **implemented + benchmarked 2026-09-01: KEEP** (no regression) |
-| 21 | `implementation-proposal-change-21.md` | D — `flip_x` UnboundLocalError + duplicate import | written, awaiting implementation session |
+| 21 | `implementation-proposal-change-21.md` | D — `flip_x` UnboundLocalError + duplicate import | **implemented + benchmarked 2026-09-02: KEEP** (no regression) |
 | — | *(no proposal)* | E — delete `toolkit/util/torch_util.py` + `tests/test_torch_util.py` | user decided: delete |
 | 22? | *(to decide)* | Scheduler weight-cache thrash (`cuda` vs `cuda:0`) | separate task per user |
 
@@ -505,6 +505,34 @@ control not triggered.
 
 **Status: IMPLEMENTED — benchmarked, no regression. KEEP** (correctness fix; speed delta
 negligible).
+
+#### Change #21 — `flip_x` UnboundLocalError + duplicate import fix (implemented 2026-09-01, branch `krea_5`)
+
+Applied as proposed in `toolkit/data_loader.py` (class **`AiToolkitDataset`** — the proposal
+doc said `LoRADataset`, corrected there): restored the merge-swallowed
+`new_file_item = copy.deepcopy(file_item)` assignment + comment in the flip_x block (now
+matches the flip_y twin and `main`), deleted the duplicate `import copy`. Net −1 line.
+**Hard crash fix**: any dataset with `flip_x: true` raised at construction; dormant under
+the benchmark config (`flip_x: false`).
+
+Local validation (all passed):
+- Control-flow repros: flip_x-only (list doubles, originals unmutated) and flip_x+flip_y
+  (×4 items, all combos once) — PASS; real `AiToolkitDataset.__init__` source check +
+  module compile/import — PASS.
+- `pytest tests/` → **44 passed**.
+
+Expected benchmark: **byte-identical timing** to the #20 run (bottom-out 3.08 s/it) — the
+fixed lines never execute under this config. No-regression confirmation only; protocol #5
+control if it deviates beyond noise.
+
+Short bench (6 epochs × 30 steps, 4 images): bottom-out cumulative **3.09 s/it** @ step 179
+vs #20's 3.08 — flat (−0.3%, noise). Samples overall avg ≈63.2 s/img (epochs 4–6 avg ≈63.1),
+≈6% faster than the #20 run — **not attributable** (code is dormant under `flip_x: false`);
+same session-drift pattern as #18/#19/#20. Bench agrees with mechanism analysis → no control
+needed (protocol #5 not triggered).
+
+**Status: IMPLEMENTED — benchmarked, no regression. KEEP** (hard crash fix for
+`flip_x: true` datasets; zero runtime cost elsewhere).
 
 ## Testing Protocol
 
