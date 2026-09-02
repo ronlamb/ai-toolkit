@@ -397,7 +397,7 @@ written; nothing applied yet.
 |---|----------|---------|--------|
 | 18 | `implementation-proposal-change-18.md` | A — `_get_step_indices` reversal | implemented 2026-08-31, awaiting user benchmark |
 | 19 | `implementation-proposal-change-19.md` | B — `pad_text_features` ragged crash (+ folded in the `lengths` CPU→GPU copy) | **implemented + benchmarked with control: KEEP** (control run slower than #19 → session drift, not regression) |
-| 20 | `implementation-proposal-change-20.md` | C — `to_device_if_needed` device compare + dtype-skip | written, awaiting implementation session |
+| 20 | `implementation-proposal-change-20.md` | C — `to_device_if_needed` device compare + dtype-skip | **implemented + benchmarked 2026-09-01: KEEP** (no regression) |
 | 21 | `implementation-proposal-change-21.md` | D — `flip_x` UnboundLocalError + duplicate import | written, awaiting implementation session |
 | — | *(no proposal)* | E — delete `toolkit/util/torch_util.py` + `tests/test_torch_util.py` | user decided: delete |
 | 22? | *(to decide)* | Scheduler weight-cache thrash (`cuda` vs `cuda:0`) | separate task per user |
@@ -475,6 +475,36 @@ below every historical band, so the apparent #19 regression vs history was never
 #19. Fix re-applied and re-validated (repro ALL PASS cpu+cuda, pytest 44).
 
 **Status: IMPLEMENTED — control-benched, no regression vs same-code baseline. KEEP.**
+
+#### Change #20 — `to_device_if_needed` device-compare + dtype-skip fix (implemented 2026-09-01, branch `krea_5`)
+
+Applied the proposed change verbatim in `extensions_built_in/sd_trainer/SDTrainer.py`:
+new `_devices_match` helper resolves unindexed vs indexed devices (`cuda` ≡ `cuda:0`,
+`mps` ≡ `mps:0`), and the `PromptEmbeds` branch now honours a requested `dtype` cast when
+the device already matches (was silently skipped). +21 lines net, one function + helper;
+all ~59 call sites untouched.
+
+Local validation (all passed):
+- Repro on CUDA covering every row of the proposal's validation table plus extras —
+  **ALL PASS**, incl. the previously-broken case: PromptEmbeds fp32 on `cuda:0` with an
+  indexed target + bf16 now returns **bf16** (old code returned fp32).
+- `pytest tests/` → **44 passed**.
+
+Expected benchmark: **neutral** — `.to()` already short-circuits internally, so this removes
+wasted Python work (~59 extra real `.to()` calls/step), not GPU copies. Per protocol,
+non-performance changes are still benchmarked (short bench, no-regression check).
+Given the #19 lesson: if the bench contradicts the neutral expectation, run a
+**same-session control** before keeping/reverting.
+
+Short bench (6 epochs × 30 steps, 4 images): bottom-out cumulative **3.08 s/it** @ step 179;
+samples overall avg ≈65.9 s/img (epochs 4–6 avg ≈67.4; min per-image 62.4). Best bottom-out
+ever recorded on this bench, but only +0.3% vs the historical best (3.09 = #16) and today's
+machine state is in a faster regime than the #19 sessions anyway (their same-code control was
+3.36 / ≈69.2). Bench agrees with mechanism analysis → **neutral, no regression**; protocol #5
+control not triggered.
+
+**Status: IMPLEMENTED — benchmarked, no regression. KEEP** (correctness fix; speed delta
+negligible).
 
 ## Testing Protocol
 

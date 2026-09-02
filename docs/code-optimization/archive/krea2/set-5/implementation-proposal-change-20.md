@@ -1,6 +1,6 @@
 # Change #20: Fix `to_device_if_needed` — device compare never matches on CUDA; dtype silently skipped
 
-**Status**: PROPOSED 2026-08-30 (approved for implementation in a separate session)
+**Status**: IMPLEMENTED + BENCHMARKED 2026-09-01 (branch `krea_5`) — no regression. KEEP
 **Complexity**: Simple (~15 lines, one module-level function + call sites unchanged)
 **Impact**: Restores the function's stated purpose ("only transfer if needed") on CUDA/MPS, and
 fixes a silent dtype-skip. **Expected neutral-to-neutral+** on the benchmark: `.to()` is already a
@@ -163,4 +163,51 @@ favour of one condition. Net ≈ +12 lines including the helper — still a sing
 
 ## Results
 
-*(pending implementation session)*
+### Implementation (2026-09-01, branch `krea_5`)
+
+Applied the proposed change **verbatim** in `extensions_built_in/sd_trainer/SDTrainer.py`:
+added module-level `_devices_match` helper + rewired both branches of
+`to_device_if_needed`. Net **+21 lines** (−24/+45), single function + one new helper;
+all ~59 call sites untouched.
+
+### Validation (2026-09-01, CUDA / RTX 4090, `.venv`) — ALL PASS
+
+Repro harness run against the **fixed** code, covering every row of the validation table
+above plus extras:
+
+| Case | Result |
+|---|---|
+| tensor fp32 on `cuda:0`, target unindexed `cuda` + bf16 → casts; **source unchanged** | PASS |
+| tensor exact match (`cuda:0` fp32, indexed target) → returns self directly (no `.to()` call) | PASS |
+| PromptEmbeds fp32 on `cuda:0`, target indexed + bf16 → **bf16 honoured** (the old silent-skip) | PASS |
+| PromptEmbeds fp32, target unindexed + bf16 → casts | PASS |
+| CPU tensor → cuda target → copies to `cuda:0` | PASS |
+| PromptEmbeds no-dtype, matching device → returns same object, no mutation | PASS |
+| `_devices_match`: `cuda:0`≡`cuda` ✓, `cuda:1`≢`cuda` ✓, identical ✓, cross-type ✗ | PASS |
+
+- `pytest tests/` → **44 passed**.
+- No existing test covers this function (as predicted in the validation plan).
+
+### Benchmark (2026-09-01, short bench: 6 epochs × 30 steps, 4 images)
+
+| Epoch | cum s/it @ epoch end | incremental s/it | samples s/img (×4) | samples avg |
+|-------|----------------------|------------------|--------------------|-------------|
+| 1 | 3.87 | 3.73 | 62.74 / 63.47 / 64.88 / 64.41 | 63.9 |
+| 2 | 3.50 | 3.13 | 62.41 / 62.61 / 62.65 / 62.79 | 62.6 |
+| 3 | 3.35 | 3.07 | 65.47 / 66.77 / 66.92 / 67.01 | 66.5 |
+| 4 | 3.27 | 3.03 | 67.49 / 67.30 / 67.24 / 67.34 | 67.3 |
+| 5 | 3.14 | 2.60 | 67.01 / 67.39 / 67.28 / 67.31 | 67.2 |
+| 6 | **3.08** | 2.80 | 67.65 / 67.72 / 67.74 / 67.83 | 67.7 |
+
+Bottom-out cumulative: **3.08 s/it** @ step 179 — lowest value ever recorded on this bench
+(prior best 3.09 = #16; #18 ≈3.12; #19 3.22; same-session control pre-#19 3.36). Samples:
+overall avg **≈65.9 s/img**, epochs 4–6 avg ≈67.4, min per-image 62.4 — inside the documented
+64–70 band and better than both #19 runs (≈68.4) and the control (≈69.2).
+
+**Verdict: neutral, as predicted.** The +0.3% bottom-out delta vs the historical best is noise;
+today's machine state sits in a faster regime than the #19 sessions anyway (their same-code
+control was 3.36). Bench agrees with mechanism analysis → no same-session control needed
+(Testing Protocol #5 not triggered).
+
+**Status: IMPLEMENTED — benchmarked, no regression. KEEP** (correctness fix; speed delta
+negligible — revert only if you object to the +21-line helper on other grounds).

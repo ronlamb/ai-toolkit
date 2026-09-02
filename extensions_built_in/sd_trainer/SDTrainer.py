@@ -47,6 +47,29 @@ adapter_transforms = transforms.Compose([
 ])
 
 
+def _devices_match(tensor_device: torch.device, target: torch.device) -> bool:
+    """
+    True if both refer to the same physical device, resolving unindexed devices
+    (``cuda`` == ``cuda:<current>``, ``mps`` == ``mps:0``). ``torch.device`` equality
+    does not do this: ``cuda`` != ``cuda:0``.
+    """
+    if tensor_device == target:
+        return True
+    if tensor_device.type != target.type:
+        return False
+    if target.index is None or tensor_device.index is None:
+        # resolve the unindexed side to its current/default device
+        if target.type == 'cuda':
+            current = torch.cuda.current_device()
+        elif target.type == 'mps':
+            current = 0
+        else:
+            current = None
+        return (tensor_device.index in (None, current)
+                and target.index in (None, current))
+    return False
+
+
 def to_device_if_needed(tensor: Union[torch.Tensor, 'PromptEmbeds'], device: torch.device, dtype: torch.dtype = None) -> Union[torch.Tensor, 'PromptEmbeds']:
     """
     Only transfer tensor to device if it's not already there, avoiding unnecessary copies.
@@ -64,22 +87,17 @@ def to_device_if_needed(tensor: Union[torch.Tensor, 'PromptEmbeds'], device: tor
     if hasattr(tensor, 'to') and not isinstance(tensor, torch.Tensor):
         # Check if already on correct device
         embed_device = tensor.text_embeds[0].device if isinstance(tensor.text_embeds, list) else tensor.text_embeds.device
-        if embed_device == device:
-            # Already on correct device, just return as-is (PromptEmbeds.to() returns self)
-            return tensor
+        if _devices_match(embed_device, device):
+            # Already on correct device; still honour a requested dtype cast
+            return tensor.to(dtype=dtype) if dtype is not None else tensor
         else:
             # Need to transfer to new device
             return tensor.to(device, dtype=dtype) if dtype is not None else tensor.to(device)
     
     # Handle regular tensors
-    if tensor.device != device:
-        if dtype is not None:
-            return tensor.to(device, dtype=dtype)
-        else:
-            return tensor.to(device)
-    elif dtype is not None and tensor.dtype != dtype:
-        return tensor.to(dtype=dtype)
-    return tensor
+    if _devices_match(tensor.device, device) and (dtype is None or tensor.dtype == dtype):
+        return tensor
+    return tensor.to(device, dtype=dtype) if dtype is not None else tensor.to(device)
 
 
 class SDTrainer(BaseSDTrainProcess):
