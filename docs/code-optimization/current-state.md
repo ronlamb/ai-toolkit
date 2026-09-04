@@ -13,14 +13,49 @@ Short benchmark = 6 epochs × 30 steps, 4 images, same dataset throughout (mixes
 |--------|-------|----------------|
 | Training (short bench) | **~3.08–3.09 s/it** | bottom-out cumulative @ step 179 (#20/#21 runs) |
 | Samples (short bench, 1024-mix) | **~64.7 s/image** | epochs 4–6 avg (#16 run; historical best) |
-| Full-run bottom-out (training) | **2.86 s/it** | 22 checkpoints, step 3784 (#16-state full run) |
-| Full-run bottom-out (samples) | **~62.6–63.6 s/img** | fast-mode checkpoints (#16-state full run) |
+| Full-run bottom-out (training) | **2.86 s/it** | 22 checkpoints, step 3784 (#21-state full runs, pre/post-merge) |
+| Full-run bottom-out (samples) | **~62.6–63.7 s/img** | fast-mode checkpoints (#21-state full runs, pre/post-merge) |
 | Convergence | **~epoch 20** (~3,440 steps) | +20 pts visual accuracy, ~31% faster convergence vs #10 state |
 
 > Current code stack: #10 + #14 + #16 + #18 + #19 + #20 + #21 (all kept).
 > #15 and #17 reverted. See `change-progress.md` for full history.
 
-### Full-run validation (state as of #16, tested 2026-08-30)
+### Full-run validation (#21 state, post-merge, tested 2026-09-04) — CURRENT BASELINE
+
+172 images/epoch, checkpoint every epoch, 9 samples per checkpoint, run to step 3784.
+Run name `anna_bell_sex_krea_ut_2`. Same code state as the pre-merge run below (change #21,
+plus the upstream main merge `0dbc7f5`, which is performance-neutral — verified below).
+Note: bar elapsed now excludes sampling/saves (upstream progress-bar pause rework `27a03a9`).
+
+| Steps | Cum s/it | Per-step avg (Δ/172) | Samples avg (s/img) | Mode |
+|-------|----------|----------------------|---------------------|------|
+| 172 | 3.16 | warm-up | 69.8 | — |
+| 344 | 3.04 | 2.91 | 67.8 | slow |
+| 516 | 3.01 | 2.95 | 68.0 | slow |
+| 688 | 2.98 | 2.87 | 64.3 | fast-ish |
+| 860 | 2.94 | 2.80 | 65.5 | fast-ish |
+| 1032 | 2.91 | 2.76 | 63.4 | fast |
+| 1204 | 2.89 | 2.75 | 63.7 | fast |
+| 1376 | 2.87 | 2.73 | 63.0 | fast |
+| 1548 | 2.86 | 2.80 | 67.8 | mixed |
+| 1720 | 2.87 | 2.98 | 67.6 | slow |
+| 1892 | 2.86 | 2.71 | 62.8 | fast |
+| 2064 | 2.86 | 2.88 | 67.8 | slow |
+| 2236 | 2.86 | 2.94 | 67.9 | slow |
+| 2408 | 2.87 | 2.97 | 67.8 | slow |
+| 2580 | 2.88 | 2.94 | 67.8 | slow |
+| 2752 | 2.88 | 2.95 | 67.9 | slow |
+| 2924 | 2.89 | 2.96 | 67.9 | slow |
+| 3096 | 2.89 | 2.95 | 67.9 | slow |
+| 3268 | 2.90 | 2.98 | 67.8 | slow |
+| 3440 | 2.90 | 2.94 | 67.9 | slow |
+| 3612 | 2.90 | 2.95 | 67.9 | slow |
+| 3784 | 2.90 | 2.95 | 67.8 | slow |
+
+Bottom-out cumulative **2.86** (steps 1548–2236); final @ 3784 = 2.90 (late-run slow-mode
+streak, not code — fast-mode values match the pre-merge run exactly).
+
+### Previous full-run validation (#21 state, pre-merge, tested 2026-08-30)
 
 172 images/epoch, checkpoint every epoch, 9 samples per checkpoint, run to step 3784.
 Run name `anna_bell_sex_krea_ut_2`. 
@@ -53,6 +88,18 @@ Run name `anna_bell_sex_krea_ut_2`.
 **Mode oscillation**: the run oscillates between fast (~2.74 s/it + ~62.7 s/img) and slow
 (~2.96 s/it + ~67.8 s/img) modes. See `gpu-performance-modes.md` for analysis.
 
+### Post-merge vs pre-merge (both #21 state)
+
+| Metric | Pre-merge (08-30) | Post-merge (09-04) | Verdict |
+|--------|-------------------|--------------------|---------|
+| Bottom-out cumulative (s/it) | **2.86** @ 3784 | **2.86** @ 1548–2236 | identical |
+| Fast-mode per-step | 2.71–2.75 | **2.71–2.75** | identical |
+| Fast-mode samples (s/img) | 62.6–63.6 | **62.8–63.7** | identical |
+| Slow-mode samples (s/img) | 67.7–67.9 | **67.8–67.9** | identical |
+| Final cum @ 3784 | 2.86 | 2.90 (+1.4%) | mode luck only |
+
+**Conclusion: the upstream merge (`0dbc7f5`) is performance-neutral.** Both full runs are the
+same code state (#21); differences are explained entirely by GPU mode oscillation.
 ### Comparison vs #10 full-run baseline (2.93 s/it bottom-out, 64.85 s/img)
 
 | Metric | #10 baseline | #16-state run | Delta |
