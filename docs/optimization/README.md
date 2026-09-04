@@ -1,3 +1,8 @@
+> **⚠️ LEGACY (2026-09-04)** — Superseded by `docs/optimization-documentation/`.
+> The `#1`–`#5` here are the **Chroma** track, referenced as `C1`–`C5` in the current
+> pipeline. Note that `implementation-checklist.md` in this same folder uses a *different*
+> `#1`–`#5` (Krea2) — bare `#N` in this directory is ambiguous.
+
 # Chroma Model Optimization Documentation
 
 This folder contains documentation for the Chroma model image generation speed optimization project.

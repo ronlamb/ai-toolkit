@@ -38,26 +38,50 @@ docs/optimization-documentation/
 
 ## CRITICAL: change-ID namespaces
 
-The repository contains **three independent `#N` numbering schemes** that collide. A bare
-`#4` is ambiguous. Every file in this pipeline uses a **prefixed ID** so provenance is
-never lost.
+Three independent `#N` schemes exist and they are **not** separated by folder — two live in
+`docs/optimization/`. Folder scoping does not disambiguate. Every file in this pipeline uses a
+**prefixed ID**.
 
-| Prefix | Source of truth | Range | Notes |
-|--------|-----------------|-------|-------|
-| `K` | `docs/code-optimization/archive/krea2/set-1..set-5/` | `K1`–`K21` | Canonical Krea2 optimization track. Primary scope. |
-| `C` | `docs/optimization/README.md` | `C1`–`C5` | Legacy Chroma track. |
-| `X` | `docs/optimization/implementation-checklist.md` | `X1`–`X5` | A *separate* Krea2 checklist with its own `#1`–`#5`. |
+| Prefix | Source of truth | Range | Header inside file | Authority |
+|--------|-----------------|-------|--------------------|-----------|
+| `K` | `docs/code-optimization/archive/krea2/set-1..set-5/` | `K1`–`K21` | Krea2, sets 1–5 | **Primary** — real verdicts, real benchmarks |
+| `C` | `docs/optimization/README.md` | `C1`–`C5` | "Chroma Model Optimization" | Secondary — legacy, verify against code |
+| `X` | `docs/optimization/implementation-checklist.md` | `X1`–`X5` | "**Krea2** Model Optimization" | **NON-AUTHORITATIVE — excluded** |
 
-Known collisions that must **never** be silently merged:
+### Collision matrix
 
-- `K2` = `torch.compile` on `predict_velocity` (**REVERTED**, Windows `OverflowError`)
-  vs `X2` = latents dtype conversion in `predict_velocity` (**COMPLETED**). Different changes,
-  same function, same bare number.
-- `K1` = VAE frame-dim in `encode_images` vs `X1` = `non_blocking` in `pad_text_features`.
-- `C1` = Chroma state-dict load vs `K1`/`X1`.
+| Bare `#N` | `K` (archive/krea2) | `C` (optimization/README) | `X` (optimization/checklist) |
+|-----------|---------------------|---------------------------|------------------------------|
+| `#1` | VAE frame dim, `encode_images` — KEPT | Chroma state-dict load | `pad_text_features` `non_blocking` — reverted |
+| `#2` | `torch.compile` on `predict_velocity` — **REVERTED, `OverflowError`** | `.clone()` removal | latents dtype in `predict_velocity` |
+| `#3` | vectorize `pad_text_features` — KEPT | batched prompt encoding — reverted | `pack_ref_latents` `non_blocking` |
+| `#4` | grad checkpointing, `mmdit` — KEPT | pipeline caching | `encode_images` `non_blocking` |
+| `#5` | timestep dtype — KEPT | `torch.inference_mode()` | timestep `non_blocking` in sampling loop |
 
-**Rule:** if a stage cannot resolve which scheme a bare `#N` belongs to, it records the
-ambiguity in `manifest.json` under `"ambiguous"` and does not guess.
+The dangerous collision is bare **`#2`**: two changes, same file, same function, opposite
+outcomes. Re-applying "`#2`" unqualified could re-add a `torch.compile` decorator that
+hard-crashes the run on Windows.
+
+### Why the `X` track is excluded
+
+1. **Self-contradicting verdicts.** `X2` is stated three ways in one file: task list and
+   status block say `REVERTED`, the detail section says `✅ COMPLETED`, and the same status
+   block says `Completed Tasks: 0/5`.
+2. **Unfilled placeholders.** `X3`/`X4`/`X5` are literal templates — `X.XXs/it`,
+   `[detailed analysis of results]`, `PENDING / REVERTED / INCONCLUSIVE`.
+3. **`X2` is already resolved.** Its distinguishing edit removes the fp32 integration cast;
+   the live tree still has `latents + (tprev - tcurr) * v.to(torch.float32)`. Casting once
+   per step while keeping fp32 latents **is `K9`**. `X2` was never applied.
+
+### Rules
+
+1. **Bare `#N` is forbidden** in every generated file. Rewrite legacy references as `K#`/`C#`
+   and name the source file inline.
+2. **Placeholder detection.** Any document containing `X.XX`, `Y.YY`,
+   `[detailed analysis of results]`, `PENDING / REVERTED / INCONCLUSIVE`, or `TODO` is
+   **non-authoritative**: citable as a pointer to history, never as a verdict or a number.
+3. **Code wins.** Where any doc contradicts the live tree, the tree is correct and the
+   contradiction is recorded, not smoothed over.
 
 ---
 
@@ -67,13 +91,13 @@ ambiguity in `manifest.json` under `"ambiguous"` and does not guess.
 
 - Krea2: `K1`, `K3`, `K4`, `K5`, `K6`, `K9`, `K10`, `K14`, `K16`, `K18`, `K19`, `K20`, `K21`
 - Legacy Chroma: `C1`, `C2`, `C4`, `C5` (`C3` batched prompt encoding was reverted)
-- `X2` only if Stage 2 confirms it is live and distinct from `K9`
+- `X` track: **entirely excluded** — non-authoritative (see namespace rules above)
 
 **Excluded** — reverted / rejected / never-applied, never enters Stage 1:
 
 - `K2`, `K7`, `K8`, `K11`, `K12`, `K13`, `K15`, `K17`
 - `C3`
-- `X1`, `X3`, `X4`, `X5` (all marked REVERTED in that checklist)
+- `X1`–`X5` — **entire `X` track**, non-authoritative (see above)
 - Everything under "Audited and rejected" in `docs/code-optimization/change-progress.md`
 
 Stage 2 may further remove any change whose code is no longer in the live tree.

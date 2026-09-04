@@ -58,12 +58,23 @@ question), and everything under "Audited and rejected" in `docs/code-optimizatio
 
 **Excluded:** C3 (batched prompt encoding, reverted).
 
-### Legacy Krea2 checklist (`X`) — source: `docs/optimization/implementation-checklist.md`
+### Legacy Krea2 checklist (`X`) — `docs/optimization/implementation-checklist.md`
 
-This file has its **own** `#1`–`#5` that collide with `K`. Most are REVERTED there.
-Document **only** `X2` (latents dtype conversion in `predict_velocity`, marked COMPLETED),
-and flag in `manifest.json` that `X2` may be the same change as `K9`. Do not merge them —
-Stage 2 decides.
+**EXCLUDED — do not document.** This file is non-authoritative: `X2` carries three
+contradictory verdicts in one file, `X3`/`X4`/`X5` are unfilled placeholder templates, and
+`Completed Tasks: 0/5` contradicts its own `✅ COMPLETED` markers. Do not create entries for
+any `X` change and do not cite this file as evidence for any status or number.
+
+Resolved for the record: `X2` (latents dtype in `predict_velocity`) was **never applied** —
+its distinguishing edit removes the fp32 integration cast, which is still present in the live
+tree. The live implementation is `K9`. Record this in `manifest.json` under `"excluded_notes"`.
+
+### Placeholder scan (applies to every input file)
+
+Before using any doc as evidence, scan it for placeholder tokens: `X.XX`, `Y.YY`,
+`[detailed analysis of results]`, `PENDING / REVERTED / INCONCLUSIVE`, `TODO`. If present,
+the file is **non-authoritative** — cite it as a pointer to history only, never for a verdict,
+status, or number. Record any such file in `manifest.json` under `"non_authoritative_sources"`.
 
 ## Procedure
 
@@ -171,9 +182,17 @@ needs same-session control, etc.>
       "status": "documented"
     }
   },
-  "excluded": ["K2", "K7", "K8", "K11", "K12", "K13", "K15", "K17", "C3"],
+  "excluded": ["K2", "K7", "K8", "K11", "K12", "K13", "K15", "K17", "C3",
+               "X1", "X2", "X3", "X4", "X5"],
   "ambiguous": [],
-  "discrepancies": []
+  "discrepancies": [],
+  "excluded_notes": [
+    "X track excluded entirely: docs/optimization/implementation-checklist.md is non-authoritative (self-contradictory verdicts, unfilled placeholders).",
+    "X2 never applied; live implementation of the single-cast optimization is K9 (fp32 integration cast still present in pipeline.py)."
+  ],
+  "non_authoritative_sources": [
+    "docs/optimization/implementation-checklist.md"
+  ]
 }
 ```
 

@@ -47,17 +47,23 @@ For every change in `manifest.json`:
    `timestep_type: linear`, `flip_x: false`, bf16, `low_vram` quantized). Several fixes are
    known to be dormant under this config (K18, K21) — that is fine, mark them `dormant: true`
    but keep them; correctness fixes stay valid even when dormant.
-4. **Resolve the `X2` vs `K9` ambiguity.** Read `predict_velocity` and the CFG loop in
-   `extensions_built_in/diffusion_models/krea2/src/pipeline.py`. Determine whether the
-   single-cast optimization is one change or two, and record the answer in
-   `manifest.json` under `"ambiguous"` with your finding. Do not merge the source docs.
-5. **Quarantine.** For `REVERTED`, `NOT_FOUND`, and `SUPERSEDED`: move the change file to
+4. **`X2` vs `K9` — pre-resolved, just confirm.** `X2` was never applied; `K9` is the live
+   implementation. Verify the fp32 integration cast is still present in the CFG loop of
+   `extensions_built_in/diffusion_models/krea2/src/pipeline.py`
+   (`latents = latents + (tprev - tcurr) * v.to(torch.float32)`). If present, close the item
+   as resolved. If it has disappeared, that is a **new discrepancy** — report it in
+   `manifest.json` under `"discrepancies"`; do not assume `X2` was retro-applied.
+5. **Placeholder scan on legacy `C` sources.** Before accepting any `C` verdict, scan
+   `docs/optimization/README.md` for placeholder tokens (`X.XX`, `[detailed analysis of
+   results]`, `PENDING / REVERTED / INCONCLUSIVE`). A `C` change whose only evidence is a
+   placeholder becomes `UNVERIFIED`, not `valid`.
+6. **Quarantine.** For `REVERTED`, `NOT_FOUND`, and `SUPERSEDED`: move the change file to
    `obsolete/<module-path>/<ID>-<slug>.md` and write `obsolete/<module-path>/OBSOLETE.md`
    entries.
    - `REVERTED` / `NOT_FOUND` → removed from the active set.
    - `SUPERSEDED` → **keep in the active set** with `"status": "superseded"`, because the
      optimization intent may still be re-appliable. Flag it loudly for Stage 3.
-6. **Update `manifest.json`** (see schema below). Do not rewrite stage-1 fields you did not
+7. **Update `manifest.json`** (see schema below). Do not rewrite stage-1 fields you did not
    verify; carry them forward.
 
 ## Known live anchors (verify, do not assume)

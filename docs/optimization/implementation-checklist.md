@@ -1,3 +1,12 @@
+> **⚠️ DEPRECATED / NON-AUTHORITATIVE (2026-09-04)**
+> Superseded by `docs/optimization-documentation/`. This file's `#1`–`#5` are a **Krea2**
+> track that collides with the canonical Krea2 numbering in
+> `docs/code-optimization/archive/krea2/`. Verdicts here are unreliable: `#2` is marked
+> REVERTED and COMPLETED in the same file, and `#3`–`#5` contain unfilled placeholders
+> (`X.XXs/it`, `[detailed analysis of results]`). Do not cite this file as evidence for a
+> status, verdict, or benchmark number. Renumbered as the `X` track and excluded from the
+> current pipeline. See `docs/optimization-documentation/README.md`.
+
 # Implementation Checklist
 
 ## Krea2 Model Optimization
